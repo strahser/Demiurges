@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Эфирные Земли: Боевая система v2 (Демиурги 2)</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1d;
+            --panel-bg: #2d2d35;
+            --vital-color: #4a7c59;
+            --chaos-color: #8b3a3a;
+            --text-color: #e0e0e0;
+            --highlight: #f4d03f;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        h1, h2, h3 { margin: 0 0 10px 0; }
+        
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex: 1;
+        }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            background: var(--panel-bg);
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+
+        .hero-panel {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 10px;
+            background: #222;
+            border-radius: 8px;
+            min-width: 200px;
+        }
+        .hero-panel.enemy { border-left: 4px solid var(--chaos-color); }
+        .hero-panel.player { border-left: 4px solid var(--vital-color); }
+
+        .board {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            min-height: 140px;
+            padding: 15px;
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            border: 1px dashed #555;
+            flex-wrap: wrap;
+        }
+
+        .card, .creature {
+            width: 100px;
+            height: 130px;
+            background: #3a3a42;
+            border: 2px solid #555;
+            border-radius: 8px;
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            font-size: 12px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+        .creature {
+            width: 110px;
+            height: 140px;
+            background: #2a3a2a;
+            border-color: var(--vital-color);
+        }
+        .creature.enemy-creature {
+            background: #3a2a2a;
+            border-color: var(--chaos-color);
+        }
+        .creature.ready { box-shadow: 0 0 10px var(--highlight); border-color: var(--highlight); }
+        .creature.attacking { 
+            background: #4a4a2a; 
+            border-color: #f39c12; 
+            transform: translateY(-10px);
+            box-shadow: 0 5px 15px rgba(243, 156, 18, 0.4);
+        }
+        .creature.blocking {
+            border-color: #3498db;
+            box-shadow: 0 0 10px #3498db;
+        }
+        .creature.dead { opacity: 0.4; filter: grayscale(100%); }
+
+        .stats {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 16px;
+            margin-top: auto;
+        }
+        .atk { color: #e74c3c; }
+        .hp { color: #2ecc71; }
+        .cost { 
+            position: absolute; top: -8px; right: -8px; 
+            background: #3498db; color: white; 
+            width: 24px; height: 24px; border-radius: 50%; 
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; border: 2px solid #fff;
+        }
+
+        .hand {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding: 10px;
+            background: var(--panel-bg);
+            border-radius: 8px;
+            min-height: 150px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            padding: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background: var(--vital-color);
+            color: white;
+            transition: background 0.2s;
+        }
+        button:hover { background: #5a9c69; }
+        button:disabled { background: #555; cursor: not-allowed; opacity: 0.6; }
+        button.danger { background: var(--chaos-color); }
+        button.danger:hover { background: #a04a4a; }
+
+        .log-panel {
+            height: 150px;
+            overflow-y: auto;
+            background: #111;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 13px;
+            color: #aaa;
+        }
+        .log-entry { margin-bottom: 4px; border-bottom: 1px solid #222; padding-bottom: 2px; }
+        .log-entry.combat { color: #f4d03f; }
+        .log-entry.death { color: #e74c3c; }
+        .log-entry.heal { color: #2ecc71; }
+
+        .phase-indicator {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--highlight);
+            padding: 5px;
+            background: rgba(244, 208, 63, 0.1);
+            border-radius: 4px;
+        }
+
+        .graveyard {
+            font-size: 12px;
+            color: #888;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none; justify-content: center; align-items: center; z-index: 100;
+        }
+        .modal {
+            background: var(--panel-bg); padding: 20px; border-radius: 10px;
+            max-width: 500px; text-align: center; border: 2px solid var(--highlight);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <div class="hero-panel enemy">
+            <div>
+                <div>👹 Порождение Пустоши</div>
+                <div>❤️ <span id="enemy-hp">28</span> | 🔮 <span id="enemy-ether">3</span>/<span id="enemy-max-ether">3</span></div>
+                <div class="graveyard">🪦 Могильник: <span id="enemy-grave">0</span></div>
+            </div>
+        </div>
+        <div class="phase-indicator" id="phase-display">Фаза: Подготовка</div>
+        <div class="hero-panel player">
+            <div>
+                <div>🧙 Арион (Витал, Ур. 1)</div>
+                <div>❤️ <span id="player-hp">30</span> | 🔮 <span id="player-ether">3</span>/<span id="player-max-ether">3</span></div>
+                <div class="graveyard">🪦 Могильник: <span id="player-grave">0</span></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="game-container">
+        <div style="text-align: center; color: #888; font-size: 12px;">Поле противника</div>
+        <div class="board" id="enemy-board"></div>
+
+        <div style="text-align: center; color: #888; font-size: 12px;">Ваше поле боя</div>
+        <div class="board" id="player-board"></div>
+
+        <div style="text-align: center; color: #888; font-size: 12px;">Ваша рука (кликните для призыва)</div>
+        <div class="hand" id="player-hand"></div>
+
+        <div class="controls">
+            <button id="btn-attack" onclick="declareAttack()" disabled>⚔️ Начать атаку</button>
+            <button id="btn-end-turn" onclick="endTurn()">⏳ Завершить ход</button>
+        </div>
+
+        <div class="log-panel" id="combat-log"></div>
+    </div>
+
+    <script>
+        // === БАЗА ДАННЫХ КАРТ ===
+        const CARD_DB = {
+            wolf: { id: 'wolf', name: 'Волк', cost: 2, atk: 4, hp: 2, maxHp: 2, class: 'vital' },
+            ancient: { id: 'ancient', name: 'Древень', cost: 4, atk: 5, hp: 8, maxHp: 8, class: 'vital' },
+            golem: { id: 'golem', name: 'Голем', cost: 4, atk: 4, hp: 7, maxHp: 7, class: 'chaos' },
+            rat: { id: 'rat', name: 'Крыса', cost: 1, atk: 2, hp: 3, maxHp: 3, class: 'chaos' },
+            spider: { id: 'spider', name: 'Паук', cost: 2, atk: 3, hp: 1, maxHp: 1, class: 'chaos' }
+        };
+
+        // === СОСТОЯНИЕ ИГРЫ ===
+        let state = {
+            phase: 'start', // start, main, declare_attack, ai_block, resolve, heal, enemy_turn, game_over
+            turn: 1,
+            player: { hp: 30, ether: 3, maxEther: 3, hand: [], board: [], graveyard: [] },
+            enemy: { hp: 28, ether: 3, maxEther: 3, hand: [], board: [], graveyard: [] },
+            combat: { attackers: [], assignments: {} } // assignments: { attackerId: [blockerId1, blockerId2] }
+        };
+
+        let creatureIdCounter = 0;
+
+        // === ИНИЦИАЛИЗАЦИЯ ===
+        function initGame() {
+            log("Добро пожаловать в Долину Зелёной Реки!", "normal");
+            // Стартовая рука
+            drawCard('player'); drawCard('player'); drawCard('player');
+            // Стартовое поле врага для демонстрации
+            summonCreature('enemy', 'golem');
+            summonCreature('enemy', 'rat');
+            
+            startPlayerTurn();
+        }
+
+        function generateId() { return `c_${++creatureIdCounter}`; }
+
+        function drawCard(who) {
+            const keys = Object.keys(CARD_DB);
+            const randomKey = keys[Math.floor(Math.random() * keys.length)];
+            state[who].hand.push({ ...CARD_DB[randomKey], uid: generateId() });
+        }
+
+        // === ФАЗА 1: ПОДГОТОВКА ===
+        function startPlayerTurn() {
+            state.phase = 'start';
+            state.turn++;
+            updatePhaseDisplay("Фаза 1: Подготовка");
+            
+            // Эфир восстанавливается до максимума каналов (не накапливается!)
+            state.player.ether = state.player.maxEther;
+            state.enemy.ether = state.enemy.maxEther;
+            
+            // Новая карта
+            drawCard('player');
+            
+            // Существа встают и лечатся (если это не первый ход, но для простоты лечим всегда в начале хода)
+            state.player.board.forEach(c => { c.isReady = true; c.hp = c.maxHp; });
+            state.enemy.board.forEach(c => { c.isReady = true; c.hp = c.maxHp; });
+            
+            log(`--- Ход ${state.turn} начался. Эфир восстановлен до ${state.player.maxEther}. Существа отдохнули и исцелились. ---`, "heal");
+            
+            setTimeout(() => {
+                state.phase = 'main';
+                updatePhaseDisplay("Фаза 2: Разыгрывание карт");
+                render();
+            }, 1000);
+        }
+
+        // === ФАЗА 2: РАЗЫГРЫВАНИЕ КАРТ ===
+        function playCard(cardIndex) {
+            if (state.phase !== 'main') return;
+            const card = state.player.hand[cardIndex];
+            
+            if (state.player.ether >= card.cost) {
+                state.player.ether -= card.cost;
+                state.player.hand.splice(cardIndex, 1);
+                
+                const creature = { ...card, uid: generateId(), isReady: true, isAttacking: false };
+                state.player.board.push(creature);
+                
+                log(`Вы призвали: ${creature.name} (${creature.atk}/${creature.hp})`, "normal");
+                render();
+            } else {
+                log("Недостаточно эфира!", "death");
+            }
+        }
+
+        function summonCreature(who, cardKey) {
+            const card = CARD_DB[cardKey];
+            const creature = { ...card, uid: generateId(), isReady: true, isAttacking: false };
+            state[who].board.push(creature);
+        }
+
+        // === ФАЗА 3: ОБЪЯВЛЕНИЕ АТАКИ ===
+        function toggleAttacker(uid) {
+            if (state.phase !== 'main' && state.phase !== 'declare_attack') return;
+            const creature = state.player.board.find(c => c.uid === uid);
+            if (creature && creature.isReady) {
+                creature.isAttacking = !creature.isAttacking;
+                state.phase = 'declare_attack';
+                render();
+            }
+        }
+
+        function declareAttack() {
+            const attackers = state.player.board.filter(c => c.isAttacking);
+            if (attackers.length === 0) return;
+            
+            state.combat.attackers = attackers.map(c => c.uid);
+            state.phase = 'ai_block';
+            updatePhaseDisplay("Фаза 4: ИИ выбирает блокирующие существа...");
+            document.getElementById('btn-attack').disabled = true;
+            render();
+            
+            setTimeout(aiAssignBlockers, 1500);
+        }
+
+        // === ФАЗА 4: БЛОКИРОВКА ИИ ===
+        function aiAssignBlockers() {
+            let assignments = {};
+            let availableBlockers = state.enemy.board.filter(c => c.hp > 0); // Мертвые не блокируют
+            
+            for (let attUid of state.combat.attackers) {
+                let attacker = state.player.board.find(c => c.uid === attUid);
+                let blockersForThis = [];
+                
+                // Простая эвристика ИИ
+                if (attacker.atk >= state.enemy.hp) {
+                    // Если может убить героя, блокируем всеми доступными
+                    blockersForThis = [...availableBlockers];
+                } else {
+                    // Пытаемся заблокировать 1-2 существами в зависимости от атаки
+                    let needed = Math.ceil(attacker.atk / 3); 
+                    for (let i = 0; i < needed && availableBlockers.length > 0; i++) {
+                        blockersForThis.push(availableBlockers.shift());
+                    }
+                }
+                
+                assignments[attUid] = blockersForThis.map(c => c.uid);
+                // Блокирующие существа тратят готовность (в оригинале они не могут атаковать в этот ход, если не имеют "Неутомимый")
+                blockersForThis.forEach(c => c.isReady = false);
+            }
+            
+            state.combat.assignments = assignments;
+            log("ИИ распределил блокирующие существа.", "normal");
+            
+            setTimeout(resolveCombat, 1000);
+        }
+
+        // === ФАЗА 5: ПОСЛЕДОВАТЕЛЬНОЕ РАЗРЕШЕНИЕ БОЯ ===
+        function resolveCombat() {
+            state.phase = 'resolve';
+            updatePhaseDisplay("Фаза 5: Разрешение боя");
+            
+            for (let attUid of state.combat.attackers) {
+                let attacker = state.player.board.find(c => c.uid === attUid);
+                if (!attacker || attacker.hp <= 0) continue; // Уже мертв
+                
+                let blockerUids = state.combat.assignments[attUid] || [];
+                let activeBlockers = blockerUids.map(uid => state.enemy.board.find(c => c.uid === uid)).filter(c => c && c.hp > 0);
+                
+                log(`⚔️ ${attacker.name} (${attacker.atk}/${attacker.hp}) начинает атаку!`, "combat");
+                
+                // 1. Атакующий бьёт первым по цепочке блокеров
+                for (let blocker of activeBlockers) {
+                    if (attacker.hp <= 0) break;
+                    
+                    log(`  → ${attacker.name} бьёт ${blocker.name}. Урон: ${attacker.atk}`, "combat");
+                    blocker.hp -= attacker.atk;
+                    
+                    if (blocker.hp <= 0) {
+                        log(`  ☠️ ${blocker.name} погибает и отправляется в могильник!`, "death");
+                        moveToGraveyard(blocker, 'enemy');
+                    }
+                }
+                
+                // 2. Выжившие защитники наносят ответный удар
+                let survivingBlockers = blockerUids.map(uid => state.enemy.board.find(c => c.uid === uid)).filter(c => c && c.hp > 0);
+                
+                if (survivingBlockers.length === 0) {
+                    // Прорыв к магу
+                    log(`  🎯 ПРОРЫВ! ${attacker.name} наносит ${attacker.atk} урона герою противника!`, "combat");
+                    state.enemy.hp -= attacker.atk;
+                } else {
+                    for (let blocker of survivingBlockers) {
+                        log(`  🛡️ ${blocker.name} наносит ответный удар ${attacker.name}. Урон: ${blocker.atk}`, "combat");
+                        attacker.hp -= blocker.atk;
+                        if (attacker.hp <= 0) {
+                            log(`  ☠️ ${attacker.name} погибает в бою!`, "death");
+                            moveToGraveyard(attacker, 'player');
+                            break; // Атакующий мертв, дальнейшие удары по нему не имеют смысла
+                        }
+                    }
+                }
+            }
+            
+            render();
+            setTimeout(healCreatures, 2000);
+        }
+
+        // === ФАЗА 6: ЛЕЧЕНИЕ ПОВРЕЖДЕНИЙ ===
+        function healCreatures() {
+            state.phase = 'heal';
+            updatePhaseDisplay("Фаза 6: Восстановление здоровья");
+            
+            let healed = false;
+            state.player.board.forEach(c => {
+                if (c.hp > 0 && c.hp < c.maxHp) { c.hp = c.maxHp; healed = true; }
+            });
+            state.enemy.board.forEach(c => {
+                if (c.hp > 0 && c.hp < c.maxHp) { c.hp = c.maxHp; healed = true; }
+            });
+            
+            if (healed) log("Бой окончен. Выжившие существа восстановили своё здоровье.", "heal");
+            
+            // Очистка флагов атаки
+            state.player.board.forEach(c => { c.isAttacking = false; c.isReady = false; }); // После атаки существа отдыхают
+            
+            render();
+            setTimeout(checkWinCondition, 1000);
+        }
+
+        function checkWinCondition() {
+            if (state.enemy.hp <= 0) {
+                state.phase = 'game_over';
+                log("🏆 ПОБЕДА! Порождение Пустоши повержено!", "heal");
+                updatePhaseDisplay("ПОБЕДА!");
+                return;
+            }
+            if (state.player.hp <= 0) {
+                state.phase = 'game_over';
+                log("💀 ПОРАЖЕНИЕ. Арион пал.", "death");
+                updatePhaseDisplay("ПОРАЖЕНИЕ");
+                return;
+            }
+            
+            // Переход к ходу противника (упрощённый для прототипа)
+            setTimeout(enemyTurn, 1000);
+        }
+
+        // === ФАЗА 7: ХОД ПРОТИВНИКА (Упрощённый) ===
+        function enemyTurn() {
+            state.phase = 'enemy_turn';
+            updatePhaseDisplay("Фаза 7: Ход противника");
+            log("--- Противник готовит атаку ---", "normal");
+            
+            // ИИ призывает существо, если есть эфир
+            if (state.enemy.ether >= 2 && state.enemy.board.length < 3) {
+                summonCreature('enemy', 'rat');
+                state.enemy.ether -= 1;
+                log("Противник призвал Крысу.", "normal");
+            }
+            
+            // ИИ атакует (упрощённо: все готовые атакуют героя напрямую, если нет блокеров, или бьют случайного)
+            setTimeout(() => {
+                let enemyAttackers = state.enemy.board.filter(c => c.isReady);
+                if (enemyAttackers.length > 0) {
+                    for (let att of enemyAttackers) {
+                        log(`👹 ${att.name} атакует вашего героя! Урон: ${att.atk}`, "combat");
+                        state.player.hp -= att.atk;
+                        att.isReady = false;
+                    }
+                } else {
+                    log("Противник пропускает атаку.", "normal");
+                }
+                render();
+                setTimeout(startPlayerTurn, 1500);
+            }, 1000);
+        }
+
+        // === ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ===
+        function moveToGraveyard(creature, who) {
+            state[who].board = state[who].board.filter(c => c.uid !== creature.uid);
+            state[who].graveyard.push(creature.name);
+        }
+
+        function log(msg, type) {
+            const logPanel = document.getElementById('combat-log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `> ${msg}`;
+            logPanel.appendChild(entry);
+            logPanel.scrollTop = logPanel.scrollHeight;
+        }
+
+        function updatePhaseDisplay(text) {
+            document.getElementById('phase-display').textContent = text;
+        }
+
+        function endTurn() {
+            if (state.phase === 'main' || state.phase === 'declare_attack') {
+                // Если игрок не атаковал, просто завершаем ход
+                state.player.board.forEach(c => { c.isAttacking = false; c.isReady = false; });
+                enemyTurn();
+            }
+        }
+
+        // === ОТРИСОВКА ===
+        function render() {
+            // Герои
+            document.getElementById('player-hp').textContent = state.player.hp;
+            document.getElementById('player-ether').textContent = state.player.ether;
+            document.getElementById('enemy-hp').textContent = state.enemy.hp;
+            document.getElementById('enemy-ether').textContent = state.enemy.ether;
+            document.getElementById('player-grave').textContent = state.player.graveyard.length;
+            document.getElementById('enemy-grave').textContent = state.enemy.graveyard.length;
+
+            // Кнопки
+            const attackersCount = state.player.board.filter(c => c.isAttacking).length;
+            const btnAttack = document.getElementById('btn-attack');
+            btnAttack.disabled = attackersCount === 0 || (state.phase !== 'main' && state.phase !== 'declare_attack');
+            btnAttack.textContent = attackersCount > 0 ? `⚔️ Начать атаку (${attackersCount})` : '⚔️ Выберите атакующих';
+
+            // Рука игрока
+            const handDiv = document.getElementById('player-hand');
+            handDiv.innerHTML = '';
+            state.player.hand.forEach((card, index) => {
+                const el = document.createElement('div');
+                el.className = 'card';
+                el.innerHTML = `
+                    <div class="cost">${card.cost}</div>
+                    <div style="text-align:center; margin-top:15px;">${card.name}</div>
+                    <div class="stats"><span class="atk">⚔️${card.atk}</span><span class="hp">❤️${card.hp}</span></div>
+                `;
+                el.onclick = () => playCard(index);
+                handDiv.appendChild(el);
+            });
+
+            // Поле игрока
+            const pBoard = document.getElementById('player-board');
+            pBoard.innerHTML = '';
+            state.player.board.forEach(c => {
+                const el = document.createElement('div');
+                el.className = `creature ${c.isReady ? 'ready' : ''} ${c.isAttacking ? 'attacking' : ''} ${c.hp <= 0 ? 'dead' : ''}`;
+                el.innerHTML = `
+                    <div style="text-align:center; font-weight:bold;">${c.name}</div>
+                    <div style="text-align:center; font-size:10px; color:#aaa;">${c.isReady ? 'Готов' : 'Отдыхает'}</div>
+                    <div class="stats">
+                        <span class="atk">⚔️ ${c.atk}</span>
+                        <span class="hp">❤️ ${c.hp}/${c.maxHp}</span>
+                    </div>
+                `;
+                if (state.phase === 'main' || state.phase === 'declare_attack') {
+                    el.onclick = () => toggleAttacker(c.uid);
+                }
+                pBoard.appendChild(el);
+            });
+
+            // Поле врага
+            const eBoard = document.getElementById('enemy-board');
+            eBoard.innerHTML = '';
+            state.enemy.board.forEach(c => {
+                const isBlocking = Object.values(state.combat.assignments).flat().includes(c.uid);
+                const el = document.createElement('div');
+                el.className = `creature enemy-creature ${isBlocking ? 'blocking' : ''} ${c.hp <= 0 ? 'dead' : ''}`;
+                el.innerHTML = `
+                    <div style="text-align:center; font-weight:bold;">${c.name}</div>
+                    <div style="text-align:center; font-size:10px; color:#aaa;">${isBlocking ? 'БЛОКИРУЕТ' : (c.isReady ? 'Готов' : 'Отдыхает')}</div>
+                    <div class="stats">
+                        <span class="atk">⚔️ ${c.atk}</span>
+                        <span class="hp">❤️ ${c.hp}/${c.maxHp}</span>
+                    </div>
+                `;
+                eBoard.appendChild(el);
+            });
+        }
+
+        // Запуск
+        initGame();
+    </script>
+</body>
+</html>

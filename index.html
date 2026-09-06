@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Эфирные Земли — браузерный прототип</title>
+<style>
+:root{--bg:#10131b;--panel:#191f2b;--panel2:#222a39;--gold:#e5bd62;--text:#eef2f7;--muted:#9da8bb;--green:#5bc98a;--red:#f06b63;--blue:#5d9ef6;--purple:#a474f6;--shadow:0 14px 40px rgba(0,0,0,.35)}
+*{box-sizing:border-box} body{margin:0;background:radial-gradient(circle at 20% 0%,#26344f 0,#10131b 45%),#10131b;color:var(--text);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;height:100vh;overflow:hidden}
+button{font:inherit} .app{height:100vh;display:grid;grid-template-columns:280px 1fr 330px;gap:12px;padding:12px}
+.panel{background:linear-gradient(180deg,rgba(34,42,57,.96),rgba(21,26,36,.96));border:1px solid #303a4c;border-radius:16px;box-shadow:var(--shadow);min-height:0}
+.sidebar,.right{padding:16px;display:flex;flex-direction:column;overflow:hidden}.brand{font-size:22px;font-weight:800;letter-spacing:.5px}.subtitle{color:var(--muted);font-size:12px;margin-top:3px}.hero{margin-top:16px;background:#121722;border:1px solid #30384a;border-radius:12px;padding:12px}.hero-row{display:flex;justify-content:space-between;gap:8px}.lvl{color:var(--gold);font-weight:700}.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}.stat{background:#1b2230;border-radius:10px;padding:9px}.label{font-size:11px;color:var(--muted)}.value{font-weight:700;margin-top:2px}
+.menu{display:grid;gap:8px;margin-top:14px}.menu button,.action,.battle-btn{border:1px solid #38445a;background:#232d3e;color:var(--text);border-radius:10px;padding:10px 12px;text-align:left;cursor:pointer;transition:.15s}.menu button:hover,.action:hover,.battle-btn:hover{transform:translateY(-1px);background:#2a364a;border-color:#50617f}.menu button.active{border-color:var(--gold);box-shadow:0 0 0 1px rgba(229,189,98,.2) inset}.actions{margin-top:auto;display:grid;gap:8px}
+.world{position:relative;overflow:hidden}.topbar{height:62px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #303a4c;background:rgba(14,18,26,.28)}.resources{display:flex;gap:10px;flex-wrap:wrap}.chip{padding:8px 10px;border-radius:999px;background:#1b2230;border:1px solid #30384a;font-size:12px}.chip b{color:var(--gold)} .view{position:absolute;inset:62px 0 0;overflow:hidden}.map{width:100%;height:100%;position:relative;background:linear-gradient(155deg,#6d8870 0%,#4f6e5b 37%,#3f5e55 65%,#6f6e5c 100%);overflow:hidden}.map:before,.map:after{content:"";position:absolute;inset:-20%;background:radial-gradient(circle at 20% 20%,rgba(255,255,255,.08),transparent 18%),radial-gradient(circle at 80% 60%,rgba(17,41,55,.2),transparent 24%),radial-gradient(circle at 45% 85%,rgba(164,113,86,.18),transparent 22%);filter:blur(5px)}.river{position:absolute;width:46%;height:140%;right:18%;top:-20%;transform:rotate(12deg);background:linear-gradient(90deg,rgba(39,104,135,.42),rgba(104,189,215,.32),rgba(35,100,129,.44));border-left:3px solid rgba(170,226,241,.18);border-right:3px solid rgba(170,226,241,.14)}.road{position:absolute;height:8px;background:#8f7c62;border-radius:99px;box-shadow:0 0 0 2px rgba(56,44,36,.16);transform-origin:left center}.road.r1{width:55%;left:10%;top:35%;transform:rotate(25deg)}.road.r2{width:50%;left:31%;top:63%;transform:rotate(-23deg)}.road.r3{width:44%;left:26%;top:52%;transform:rotate(70deg)}
+.node{position:absolute;width:60px;height:60px;border-radius:50%;display:grid;place-items:center;cursor:pointer;z-index:3;transform:translate(-50%,-50%);border:3px solid #d9d2bf;box-shadow:0 8px 18px rgba(0,0,0,.3);font-size:22px}.node small{position:absolute;top:62px;white-space:nowrap;font-size:11px;background:rgba(12,16,22,.78);padding:4px 7px;border-radius:7px;border:1px solid rgba(255,255,255,.1)}.node.village{background:#7d5d48}.node.lab{background:#3c7191}.node.ruin{background:#5c4b78}.node.monster{background:#8a433f}.node.portal{background:#5c46a8}.node.visited{filter:saturate(.6)}
+.hero-token{position:absolute;width:48px;height:48px;z-index:5;border-radius:14px;background:#e3bc62;color:#2a2517;display:grid;place-items:center;font-weight:900;border:3px solid #fff1b3;box-shadow:0 8px 24px rgba(0,0,0,.35);transform:translate(-50%,-50%);transition:left .35s,top .35s}.map-hint{position:absolute;left:14px;bottom:14px;background:rgba(12,16,22,.8);border:1px solid rgba(255,255,255,.1);padding:10px 12px;border-radius:10px;color:#d7deea;font-size:12px;z-index:6}
+.right h3{margin:0 0 10px}.log{flex:1;overflow:auto;font-size:12px;line-height:1.45;background:#111722;border-radius:12px;border:1px solid #2e3748;padding:10px}.log p{margin:0 0 9px}.quest{margin-top:12px;background:#111722;border:1px solid #2e3748;padding:11px;border-radius:12px;font-size:12px}.quest b{color:var(--gold)}
+.modal-wrap{position:fixed;inset:0;background:rgba(4,7,11,.72);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}.modal-wrap.open{display:flex}.modal{width:min(1080px,95vw);max-height:92vh;overflow:auto;background:linear-gradient(180deg,#20293a,#111722);border:1px solid #45536b;border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.55);padding:18px}.modal-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.close{background:#2a3344;border:1px solid #45536b;color:#fff;border-radius:9px;padding:8px 11px;cursor:pointer}.battle{display:grid;grid-template-columns:1fr 1.4fr 1fr;gap:12px;margin-top:14px}.duelist,.arena{background:#111722;border:1px solid #2d384b;border-radius:14px;padding:13px}.duelist h4,.arena h4{margin:0 0 10px}.hpbar{height:12px;border-radius:99px;background:#313846;overflow:hidden}.hpfill{height:100%;background:linear-gradient(90deg,#61d394,#31905c);width:100%;transition:.25s}.enemy .hpfill{background:linear-gradient(90deg,#ef7d75,#9a3d39)}.eth{margin-top:8px;color:#8dd4ff;font-size:12px}.arena-log{height:160px;overflow:auto;font-size:12px;background:#0d121b;padding:10px;border-radius:10px;border:1px solid #293346}.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:11px}.card{background:linear-gradient(180deg,#293449,#1d2534);border:1px solid #4b5a72;border-radius:12px;padding:11px;min-height:150px;display:flex;flex-direction:column;cursor:pointer;transition:.15s}.card:hover{transform:translateY(-3px);border-color:var(--gold)}.card.disabled{opacity:.45;cursor:not-allowed;transform:none}.card .type{font-size:10px;color:#aab5c7;text-transform:uppercase;letter-spacing:1px}.card .name{font-weight:800;margin:8px 0}.card .desc{font-size:11px;color:#c5cedc;flex:1}.card .cost{color:#8dd4ff;font-weight:700}.battle-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}.battle-btn{background:#36445b;text-align:center}.battle-btn.primary{background:#6a5430;border-color:#b38d4a}.battle-btn.danger{background:#5a302f;border-color:#8b4742}.result{margin-top:12px;padding:12px;border-radius:12px;background:#171e2a;border:1px solid #39455a;display:none}.result.show{display:block}.small{font-size:11px;color:var(--muted)}
+@media(max-width:1050px){.app{grid-template-columns:230px 1fr}.right{display:none}.battle{grid-template-columns:1fr 1fr}.arena{grid-column:1/-1;order:-1}}@media(max-width:760px){body{overflow:auto}.app{height:auto;min-height:100vh;grid-template-columns:1fr}.sidebar{display:none}.world{height:78vh;min-height:600px}.modal{padding:12px}.battle{grid-template-columns:1fr}.cards{grid-template-columns:1fr 1fr}.arena{grid-column:auto}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="panel sidebar">
+    <div class="brand">ЭФИРНЫЕ ЗЕМЛИ</div><div class="subtitle">Прототип пошаговой фэнтези-стратегии</div>
+    <div class="hero">
+      <div class="hero-row"><strong id="heroName">Арион</strong><span class="lvl">Ур. <span id="heroLevel">1</span></span></div>
+      <div class="small" id="heroFaction">Витал · школа жизни</div>
+      <div class="stats"><div class="stat"><div class="label">Опыт</div><div class="value" id="xp">0 / 100</div></div><div class="stat"><div class="label">Золото</div><div class="value" id="gold">120</div></div><div class="stat"><div class="label">Резерв эфира</div><div class="value" id="ether">3</div></div><div class="stat"><div class="label">Победы</div><div class="value" id="wins">0</div></div></div>
+    </div>
+    <div class="menu"><button class="active" id="worldBtn">🗺 Карта мира</button><button id="deckBtn">🃏 Колода</button><button id="journalBtn">📖 Журнал</button></div>
+    <div class="actions"><button class="action" id="restBtn">⛺ Отдохнуть (+1 эфир)</button><button class="action" id="saveBtn">💾 Сохранить</button><button class="action" id="resetBtn">↻ Новая игра</button></div>
+  </aside>
+  <main class="panel world">
+    <div class="topbar"><div><strong id="locationName">Долина Зелёной Реки</strong><div class="small" id="locationDesc">Территория виталов. Щёлкайте по объектам на карте.</div></div><div class="resources"><span class="chip">🌿 <b id="life">5</b></span><span class="chip">🔥 <b id="chaos">5</b></span><span class="chip">💧 <b id="kinetic">5</b></span><span class="chip">⚙️ <b id="synthesis">5</b></span></div></div>
+    <div class="view"><div class="map" id="map"><div class="river"></div><div class="road r1"></div><div class="road r2"></div><div class="road r3"></div><div class="map-hint">Ход: <b id="turn">1</b> · Клик по месту перемещает героя</div></div></div>
+  </main>
+  <aside class="panel right"><h3>События</h3><div class="log" id="log"></div><div class="quest"><b>Задание</b><div id="questText">Посетите лабораторию и добудьте редкое заклинание.</div></div></aside>
+</div>
+
+<div class="modal-wrap" id="battleModal"><div class="modal"><div class="modal-head"><div><h2 id="battleTitle" style="margin:0">Магическая дуэль</h2><div class="small" id="battleSub">Противник готовится к бою</div></div><button class="close" id="closeBattle">×</button></div>
+<div class="battle"><section class="duelist"><h4>🧙 <span id="playerDuelName">Арион</span></h4><div class="hpbar"><div class="hpfill" id="pHpFill"></div></div><div class="small" id="pHpText">30 / 30</div><div class="eth">Эфир: <span id="pEth">3</span></div><div class="small" id="handInfo" style="margin-top:8px">Ходите картами из руки.</div></section>
+<section class="arena"><h4>Поле боя</h4><div class="arena-log" id="battleLog"></div><div class="cards" id="cards"></div><div class="battle-actions"><button class="battle-btn" id="endTurnBtn">Завершить ход</button><button class="battle-btn danger" id="fleeBtn">Сбежать</button></div><div class="result" id="battleResult"></div></section>
+<section class="duelist enemy"><h4>👹 <span id="enemyName">Порождение Пустоши</span></h4><div class="hpbar"><div class="hpfill" id="eHpFill"></div></div><div class="small" id="eHpText">28 / 28</div><div class="eth">Эфир: <span id="eEth">3</span></div><div class="small" id="enemyIntent" style="margin-top:8px">Намерение: атака</div></section></div>
+</div></div>
+
+<div class="modal-wrap" id="genericModal"><div class="modal"><div class="modal-head"><h2 id="genericTitle">Информация</h2><button class="close" id="genericClose">×</button></div><div id="genericBody" style="margin-top:12px"></div></div></div>
+<script>
+const SAVE_KEY='etherlands_proto_v1';
+const cardPool=[
+ {id:'sap',name:'Живительный сок',type:'spell',cost:1,desc:'Восстановить 7 здоровья.',effect:g=>{g.player.hp=Math.min(g.player.maxHp,g.player.hp+7); bl('Вы восстанавливаете 7 HP.');}},
+ {id:'thorn',name:'Водоворот шипов',type:'attack',cost:1,desc:'Нанести 6 урона.',effect:g=>{g.enemy.hp-=6; bl('Шипы наносят 6 урона.');}},
+ {id:'sprite',name:'Дух рощи',type:'creature',cost:2,desc:'Призвать духа: 8 урона в конце хода.',effect:g=>{g.summon+=8; bl('Дух рощи присоединяется к вам.');}},
+ {id:'ward',name:'Живой барьер',type:'spell',cost:2,desc:'Получить щит на 8 урона.',effect:g=>{g.shield+=8; bl('Барьер поглощает до 8 урона.');}},
+ {id:'ember',name:'Огненный залп',type:'attack',cost:2,desc:'Нанести 10 урона, затем получить 2 урона.',effect:g=>{g.enemy.hp-=10; g.player.hp-=2; bl('Пламя наносит 10 урона, отдача — 2.');}},
+ {id:'bolt',name:'Эфирная стрела',type:'attack',cost:1,desc:'Нанести 5 урона и добрать карту.',effect:g=>{g.enemy.hp-=5; draw(1); bl('Стрела наносит 5 урона.');}},
+ {id:'curse',name:'Проклятие слабости',type:'spell',cost:1,desc:'Следующая атака врага слабее на 4.',effect:g=>{g.weak=4; bl('Следующая атака врага ослаблена.');}},
+ {id:'drain',name:'Высасывание эфира',type:'spell',cost:2,desc:'Нанести 6 урона и получить 1 эфир.',effect:g=>{g.enemy.hp-=6; g.player.ether=Math.min(8,g.player.ether+1); bl('Вы крадёте эфир и наносите 6 урона.');}}
+];
+const nodes=[
+ {id:'village',x:18,y:28,label:'Лесная слобода',type:'village'},
+ {id:'lab',x:42,y:22,label:'Лаборатория',type:'lab'},
+ {id:'ruin',x:72,y:30,label:'Древние руины',type:'ruin'},
+ {id:'monster1',x:26,y:62,label:'Гнездо хаота',type:'monster'},
+ {id:'monster2',x:64,y:72,label:'Одержимый голем',type:'monster'},
+ {id:'portal',x:84,y:48,label:'Бледный портал',type:'portal'},
+ {id:'village2',x:48,y:82,label:'Приют странников',type:'village'}
+];
+let state={turn:1,hero:{x:28,y:52},heroLevel:1,xp:0,gold:120,ether:3,maxEther:8,wins:0,life:5,chaos:5,kinetic:5,synthesis:5,visited:{},deck:['sap','thorn','sprite','ward','bolt','ember'],quest:{lab:false,ruin:false},log:['Добро пожаловать в Эфирные Земли.','Найдите лабораторию — там вас ждёт новое заклинание.']};
+let battle=null;
+const $=id=>document.getElementById(id);
+function save(){localStorage.setItem(SAVE_KEY,JSON.stringify(state));log('Прогресс сохранён.');}
+function load(){try{let s=JSON.parse(localStorage.getItem(SAVE_KEY));if(s)state=s}catch(e){}}
+function log(t){state.log.unshift(t);state.log=state.log.slice(0,40);renderLog();}
+function bl(t){if(!battle)return;battle.log.unshift(t);renderBattleLog();}
+function renderLog(){$('log').innerHTML=state.log.map(x=>`<p>• ${x}</p>`).join('')}
+function render(){
+ $('heroLevel').textContent=state.heroLevel;$('xp').textContent=`${state.xp} / ${state.heroLevel*100}`;$('gold').textContent=state.gold;$('ether').textContent=state.ether;$('wins').textContent=state.wins;
+ $('life').textContent=state.life;$('chaos').textContent=state.chaos;$('kinetic').textContent=state.kinetic;$('synthesis').textContent=state.synthesis;$('turn').textContent=state.turn;
+ $('heroFaction').textContent='Витал · школа жизни';$('questText').textContent=state.quest.lab?'Посетите древние руины и выясните тайну бледного портала.':'Посетите лабораторию и добудьте редкое заклинание.';
+ renderLog();renderHeroToken();}
+function renderHeroToken(){let m=$('map');let t=document.querySelector('.hero-token');if(!t){t=document.createElement('div');t.className='hero-token';t.textContent='✦';m.appendChild(t)}t.style.left=state.hero.x+'%';t.style.top=state.hero.y+'%'}
+function buildNodes(){for(const n of nodes){let el=document.createElement('div');el.className='node '+n.type+(state.visited[n.id]?' visited':'');el.style.left=n.x+'%';el.style.top=n.y+'%';el.innerHTML=icon(n.type)+`<small>${n.label}</small>`;el.onclick=()=>travel(n);$('map').appendChild(el)}}
+function icon(t){return t==='village'?'🏕️':t==='lab'?'⚗️':t==='ruin'?'🏛️':t==='monster'?'👹':'🜁'}
+function travel(n){state.hero.x=n.x;state.hero.y=n.y;state.turn++;state.visited[n.id]=true;renderHeroToken();
+ if(n.type==='monster'){log(`Вы вступили в бой у точки «${n.label}».`);startBattle(n.label)}
+ else if(n.type==='village'){let g=25+Math.floor(Math.random()*26);state.gold+=g;state.ether=Math.min(state.maxEther,state.ether+1);log(`В поселении вы получили ${g} золота и восстановили 1 эфир.`);}
+ else if(n.type==='lab'){if(!state.quest.lab){state.quest.lab=true;state.deck.push('drain');state.ether=Math.min(state.maxEther,state.ether+2);log('Лаборатория передаёт вам заклинание «Высасывание эфира». Квест обновлён.');}else log('В лаборатории пока нет новых исследований.');}
+ else if(n.type==='ruin'){state.quest.ruin=true;state.gold+=80;log('В руинах вы нашли 80 золота и загадочный фрагмент бледного мира.');}
+ else if(n.type==='portal'){let g=40+Math.floor(Math.random()*41);state.gold+=g;state.ether=Math.min(state.maxEther,state.ether+2);log(`Портал дрогнул. Из него выпало ${g} золота и 2 эфира.`)}
+ render();save();}
+function startBattle(label){let hp=24+Math.floor(Math.random()*9);battle={enemy:{name:label.includes('голем')?'Одержимый голем':'Порождение хаоса',hp,maxHp:hp,ether:3},player:{hp:30,maxHp:30,ether:Math.max(1,state.ether),deck:[...state.deck],hand:[],draw:[],discard:[],shield:0},summon:0,weak:0,turn:1,log:[]};battle.player.draw=[...battle.player.deck].sort(()=>Math.random()-.5);draw(3);openBattle();bl('Дуэль началась.');renderBattle();}
+function draw(n){for(let i=0;i<n;i++){if(!battle.player.draw.length){battle.player.draw=[...battle.player.discard].sort(()=>Math.random()-.5);battle.player.discard=[]}if(battle.player.draw.length)battle.player.hand.push(battle.player.draw.shift())}}
+function renderBattle(){if(!battle)return;$('enemyName').textContent=battle.enemy.name;$('pHpText').textContent=`${Math.max(0,battle.player.hp)} / ${battle.player.maxHp}`;$('eHpText').textContent=`${Math.max(0,battle.enemy.hp)} / ${battle.enemy.maxHp}`;$('pHpFill').style.width=Math.max(0,battle.player.hp/battle.player.maxHp*100)+'%';$('eHpFill').style.width=Math.max(0,battle.enemy.hp/battle.enemy.maxHp*100)+'%';$('pEth').textContent=battle.player.ether;$('eEth').textContent=battle.enemy.ether;$('handInfo').textContent=`Карты в руке: ${battle.player.hand.length} · колода: ${battle.player.draw.length}`;$('enemyIntent').textContent=`Намерение: ${4+(battle.turn%2)*2} урона`;
+ $('cards').innerHTML='';battle.player.hand.forEach((id,i)=>{let c=cardPool.find(x=>x.id===id);let el=document.createElement('div');el.className='card'+(battle.player.ether<c.cost?' disabled':'');el.innerHTML=`<div class="type">${c.type}</div><div class="name">${c.name}</div><div class="desc">${c.desc}</div><div class="cost">Эфир ${c.cost}</div>`;el.onclick=()=>playCard(i);$('cards').appendChild(el)});renderBattleLog();}
+function renderBattleLog(){$('battleLog').innerHTML=battle.log.slice(0,25).map(x=>`<p>• ${x}</p>`).join('')}
+function playCard(i){if(!battle)return;let id=battle.player.hand[i],c=cardPool.find(x=>x.id===id);if(!c||battle.player.ether<c.cost)return;battle.player.ether-=c.cost;battle.player.hand.splice(i,1);c.effect(battle);battle.player.discard.push(id);checkBattle();renderBattle();}
+function enemyTurn(){if(!battle)return;let dmg=4+(battle.turn%2)*2;if(battle.weak){dmg=Math.max(0,dmg-battle.weak);battle.weak=0}if(battle.enemy.ether>=2&&Math.random()<.3){battle.enemy.ether-=2;battle.enemy.hp=Math.min(battle.enemy.maxHp,battle.enemy.hp+5);bl('Враг восстанавливает 5 HP.')}else{let block=Math.min(battle.player.shield,dmg);battle.player.shield-=block;dmg-=block;battle.player.hp-=dmg;bl(`Враг атакует на ${dmg}${block?' (щит поглотил '+block+')':''}.`)}if(battle.summon){battle.enemy.hp-=battle.summon;bl(`Дух рощи наносит ${battle.summon} урона.`)}checkBattle()}
+function endTurn(){if(!battle||$('battleResult').classList.contains('show'))return;enemyTurn();if(!battle)return;battle.turn++;battle.player.ether=Math.min(8,battle.player.ether+1);draw(1);renderBattle();}
+function checkBattle(){if(battle.enemy.hp<=0){winBattle();return}if(battle.player.hp<=0){loseBattle();return}}
+function winBattle(){let reward=35+Math.floor(Math.random()*31);state.gold+=reward;state.wins++;state.xp+=50;state.ether=Math.min(state.maxEther,battle.player.ether+1);state.visited=state.visited||{};bl('Победа!');$('battleResult').className='result show';$('battleResult').innerHTML=`<b>Победа!</b><div class="small">+${reward} золота · +50 опыта · +1 эфир</div><div class="battle-actions"><button class="battle-btn primary" onclick="closeBattle()">Вернуться на карту</button></div>`;levelUp();render();save();}
+function loseBattle(){state.gold=Math.max(0,state.gold-20);state.ether=1;bl('Вы проиграли и потеряли 20 золота.');$('battleResult').className='result show';$('battleResult').innerHTML=`<b>Поражение</b><div class="small">-20 золота. Герой эвакуирован в безопасное место.</div><div class="battle-actions"><button class="battle-btn" onclick="closeBattle()">Вернуться на карту</button></div>`;render();save();}
+function levelUp(){while(state.xp>=state.heroLevel*100){state.xp-=state.heroLevel*100;state.heroLevel++;state.maxEther++;state.ether=state.maxEther;log(`Новый уровень: ${state.heroLevel}. Максимальный эфир увеличен.`)}}
+function openBattle(){$('battleModal').classList.add('open');$('battleResult').className='result';}
+function closeBattle(){battle=null;$('battleModal').classList.remove('open');render();}
+function showGeneric(title,html){$('genericTitle').textContent=title;$('genericBody').innerHTML=html;$('genericModal').classList.add('open')}
+$('closeBattle').onclick=closeBattle;$('genericClose').onclick=()=>$('genericModal').classList.remove('open');$('endTurnBtn').onclick=endTurn;$('fleeBtn').onclick=()=>{if(battle){bl('Вы отступили.');state.gold=Math.max(0,state.gold-10);closeBattle();log('Вы отступили от боя и потеряли 10 золота.');save()}};
+$('restBtn').onclick=()=>{state.ether=Math.min(state.maxEther,state.ether+1);state.turn++;log('Вы устроили привал и восстановили 1 эфир.');render();save()};$('saveBtn').onclick=save;$('resetBtn').onclick=()=>{if(confirm('Начать новую игру?')){localStorage.removeItem(SAVE_KEY);location.reload()}};
+$('deckBtn').onclick=()=>showGeneric('Колода',`<p>Активная колода: <b>${state.deck.length}</b> карт.</p><div class="cards">${state.deck.map(id=>{let c=cardPool.find(x=>x.id===id);return `<div class="card" style="cursor:default"><div class="type">${c.type}</div><div class="name">${c.name}</div><div class="desc">${c.desc}</div><div class="cost">Эфир ${c.cost}</div></div>`}).join('')}</div>`);
+$('journalBtn').onclick=()=>showGeneric('Журнал',`<p>Текущий уровень: <b>${state.heroLevel}</b>. Побед: <b>${state.wins}</b>. Путей открыто: <b>${Object.keys(state.visited).length}</b>.</p><p>Лаборатория: ${state.quest.lab?'✓':'—'}<br>Древние руины: ${state.quest.ruin?'✓':'—'}</p><p class="small">Это оригинальный игровой прототип, вдохновлённый жанром магических дуэлей и пошаговых фэнтези-стратегий.</p>`);
+load();buildNodes();render();
+</script>
+</body>
+</html>

@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Демиурги — Полноценный прототип (карта + бой)</title>
+<style>
+:root{
+  --gold:#e5bd62; --parchment:#d9c9a3; --wood:#4a3220;
+  --bg:#07060f; --violet:#a04fff; --cyan:#38e1ff; --red:#ff4d5e;
+  --card-w:118px; --card-h:168px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:Georgia,'Times New Roman',serif;background:var(--bg);color:#eee;overflow:hidden}
+/* ---------- Top bar (общий) ---------- */
+#topbar{display:flex;align-items:center;gap:14px;padding:10px 18px;
+  background:linear-gradient(180deg,#3a2a1c,#241a10);border-bottom:3px solid #c9a227;z-index:30;position:relative}
+#topbar .portrait{width:56px;height:56px;border-radius:50%;border:3px solid #c9a227;overflow:hidden;
+  background:radial-gradient(circle,#5a4a6a,#222);display:grid;place-items:center;font-size:32px;flex:none}
+#topbar .hero-meta{color:#f3e6c3;line-height:1.25;min-width:190px}
+#topbar .hero-meta b{font-size:20px;letter-spacing:.5px}
+#topbar nav{display:flex;gap:10px;flex-wrap:wrap;margin-left:8px}
+.btn{font-family:inherit;cursor:pointer;border:2px solid #c9a227;border-radius:10px;padding:8px 16px;
+  background:linear-gradient(180deg,#6b4e2e,#3d2c18);color:#ffe9b0;font-size:15px;transition:.18s}
+.btn:hover{transform:translateY(-2px);filter:brightness(1.15)}
+.btn.ghost{background:rgba(255,255,255,.06);border-color:#6b5a8a;color:#d9ccff}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+.btn.active-tab{outline:2px solid #fff3}
+#resources{margin-left:auto;display:flex;gap:14px;color:#ffe9b0;font-size:14px;align-items:center}
+/* ---------- Views ---------- */
+.view{position:absolute;inset:77px 0 0;display:none}
+.view.active{display:block;animation:viewIn .5s ease}
+@keyframes viewIn{from{opacity:0;transform:scale(1.015)}to{opacity:1;transform:none}}
+/* ---------- MAP ---------- */
+#view-map{background:radial-gradient(circle at 50% 30%,#e8d9b0,#c9b183 60%,#a68d5f);color:#3a2a14;overflow:hidden}
+.map-wrap{display:grid;grid-template-columns:1fr 300px;height:100%}
+.map-canvas{position:relative;overflow:hidden;
+  background:
+   radial-gradient(ellipse 60% 35% at 30% 60%,rgba(110,170,90,.55),transparent 70%),
+   radial-gradient(ellipse 40% 50% at 78% 40%,rgba(150,150,150,.5),transparent 70%),
+   linear-gradient(180deg,#e2d3a5,#cfc090);}
+.map-canvas svg.river{position:absolute;inset:0;width:100%;height:100%}
+.map-node{position:absolute;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;
+  display:grid;place-items:center;font-size:30px;cursor:pointer;z-index:3;
+  background:radial-gradient(circle at 35% 30%,#fff8,#0000 50%),#f4e9c8;
+  border:3px solid #6b5433;box-shadow:0 4px 14px rgba(0,0,0,.35);transition:.2s}
+.map-node:hover{transform:translate(-50%,-50%) scale(1.15);box-shadow:0 0 18px #fff,0 4px 14px rgba(0,0,0,.4)}
+.map-node small{position:absolute;top:66px;white-space:nowrap;font-size:12px;background:#2a1f10;color:#ffe9b0;
+  padding:3px 8px;border-radius:8px}
+.map-node.done{filter:grayscale(.5);opacity:.75}
+.map-node.danger{border-color:#a02727;animation:pulseDanger 1.6s infinite}
+@keyframes pulseDanger{0%,100%{box-shadow:0 0 0 0 rgba(200,30,30,.6)}50%{box-shadow:0 0 0 12px rgba(200,30,30,0)}}
+#heroToken{position:absolute;width:46px;height:46px;z-index:5;font-size:32px;transform:translate(-50%,-90%);
+  transition:left .8s cubic-bezier(.5,0,.3,1.2),top .8s cubic-bezier(.5,0,.3,1.2);filter:drop-shadow(0 4px 6px rgba(0,0,0,.5))}
+#heroToken.moving{animation:bob .4s infinite alternate}
+@keyframes bob{from{margin-top:0}to{margin-top:-8px}}
+.event-panel{background:linear-gradient(180deg,#efe0b8,#d9c49a);border-left:4px solid var(--wood);padding:16px;overflow-y:auto}
+.event-panel h3{font-size:26px;text-align:center;border-bottom:2px solid #8a6f45;padding-bottom:8px;margin-bottom:10px}
+#eventLog{font-size:14px;line-height:1.5;display:flex;flex-direction:column;gap:8px}
+#eventLog .ev{background:#fff8;border:1px solid #8a6f4588;border-radius:8px;padding:8px 10px;animation:viewIn .4s}
+#questBox{margin-top:12px;background:#2a1f10;color:#ffe9b0;border-radius:10px;padding:10px;font-size:13px}
+/* ---------- BATTLE ---------- */
+#view-battle{background:radial-gradient(ellipse at 50% 120%,#2a0a4a 0%,#0d0620 45%,#030208 100%);overflow:hidden;position:absolute}
+#stars{position:absolute;inset:0;pointer-events:none}
+#magicCircle{position:absolute;left:50%;top:52%;width:min(72vmin,640px);height:min(72vmin,640px);transform:translate(-50%,-50%);
+  border-radius:50%;pointer-events:none;opacity:.8;
+  background:repeating-conic-gradient(from 0deg,rgba(160,79,255,.14) 0 6deg,transparent 6deg 12deg);
+  border:2px solid rgba(160,79,255,.5);box-shadow:0 0 60px rgba(160,79,255,.45),inset 0 0 60px rgba(160,79,255,.25);
+  animation:spin 40s linear infinite}
+#magicCircle::after{content:"";position:absolute;inset:12%;border-radius:50%;border:1px dashed rgba(56,225,255,.5);animation:spin 25s linear infinite reverse}
+@keyframes spin{to{transform:translate(-50%,-50%) rotate(360deg)}}
+.fighters{display:flex;justify-content:center;gap:min(6vw,90px);padding:14px 10px 4px;position:relative;z-index:3}
+.fighter{display:flex;align-items:center;gap:12px}
+.fighter .ava{width:74px;height:74px;border-radius:50%;font-size:40px;display:grid;place-items:center;background:#1a1030;
+  border:3px solid var(--violet);box-shadow:0 0 18px var(--violet);position:relative}
+.fighter.enemy .ava{border-color:var(--red);box-shadow:0 0 18px var(--red)}
+.fighter .bars{width:min(30vw,260px)}
+.bar{height:18px;border-radius:9px;background:#111;border:1px solid #555;overflow:hidden;margin-bottom:6px;position:relative}
+.bar.hp .fill{background:linear-gradient(90deg,#c00,#ff7a6a);width:100%;transition:width .6s}
+.bar.ether .fill{background:linear-gradient(90deg,#2aa8ff,#9beaff);width:100%;transition:width .6s}
+.bar span{position:absolute;inset:0;font-size:11px;display:grid;place-items:center;color:#fff;text-shadow:0 1px 2px #000;font-family:Arial}
+.fighter .nm{font-size:15px;color:#e9dcff;margin-bottom:4px;text-shadow:0 0 8px var(--violet)}
+.shake{animation:shk .45s}
+@keyframes shk{0%,100%{transform:none}20%{transform:translate(-8px,3px) rotate(-2deg)}40%{transform:translate(7px,-4px)}60%{transform:translate(-5px,-2px)}80%{transform:translate(4px,3px)}}
+#grid3x3{display:grid;grid-template-columns:repeat(3,110px);gap:12px;justify-content:center;margin:10px auto 4px;position:relative;z-index:3}
+.cell{width:110px;height:130px;border-radius:12px;border:2px solid rgba(160,79,255,.55);cursor:pointer;position:relative;
+  background:rgba(30,10,60,.55);box-shadow:0 0 16px rgba(160,79,255,.25),inset 0 0 18px rgba(160,79,255,.12);
+  display:grid;place-items:center;font-size:44px;transition:.2s;transform-style:preserve-3d}
+.cell:hover{border-color:#fff;box-shadow:0 0 22px #fff8}
+.cell.target{border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyan),0 0 24px var(--cyan);animation:cellPulse 1s infinite}
+@keyframes cellPulse{50%{box-shadow:0 0 0 6px rgba(56,225,255,.4),0 0 30px var(--cyan)}}
+.cell.played{border-color:#fff;background:rgba(90,40,160,.7)}
+.cell.played.enemy-play{background:rgba(150,30,40,.65)}
+.cell .dmg{position:absolute;font-family:Arial;font-weight:900;font-size:26px;color:#ffd34d;text-shadow:0 2px 4px #000;
+  animation:floatUp 1s forwards;pointer-events:none}
+@keyframes floatUp{to{transform:translateY(-60px);opacity:0}}
+.cell .flip{animation:flip .5s}
+@keyframes flip{from{transform:rotateY(90deg) scale(.7)}to{transform:none}}
+/* рука */
+#hand{display:flex;gap:12px;justify-content:center;align-items:flex-end;padding:10px;position:relative;z-index:3;min-height:190px}
+.card3d{width:var(--card-w);height:var(--card-h);border-radius:12px;cursor:pointer;position:relative;flex:none;
+  background:linear-gradient(160deg,#2b1a5e,#120a2e 60%,#1d0f3d);border:2px solid #8a6bd8;
+  box-shadow:0 6px 18px rgba(0,0,0,.6);transition:transform .2s,box-shadow .2s;overflow:hidden;
+  animation:drawIn .45s backwards}
+@keyframes drawIn{from{transform:translateY(80px) rotate(6deg);opacity:0}to{transform:none;opacity:1}}
+.card3d:hover{transform:translateY(-16px) scale(1.05);box-shadow:0 14px 30px rgba(160,79,255,.5);z-index:5}
+.card3d.selected{border-color:var(--cyan);box-shadow:0 0 0 3px var(--cyan),0 0 26px var(--cyan);transform:translateY(-16px)}
+.card3d .art{height:74px;display:grid;place-items:center;font-size:44px;background:radial-gradient(circle at 50% 60%,rgba(160,79,255,.5),transparent 70%)}
+.card3d .nm2{font-size:12px;text-align:center;color:#ffe9b0;padding:2px 4px;min-height:30px}
+.card3d .cost{position:absolute;top:4px;left:4px;width:26px;height:26px;border-radius:50%;background:#1a6cff;color:#fff;
+  display:grid;place-items:center;font-family:Arial;font-weight:800;border:2px solid #fff;font-size:14px}
+.card3d .txt{font-size:10px;color:#bdb0e8;text-align:center;padding:0 6px;font-family:Arial}
+.card3d.fire{border-color:#ff8a3d}.card3d.frost{border-color:#6ad4ff}.card3d.nature{border-color:#7de08a}
+.card3d.arcane{border-color:#c98aff}.card3d.holy{border-color:#ffe27a}
+/* кнопки боя */
+#battleBtns{display:flex;gap:12px;justify-content:center;align-items:center;padding:6px 10px 14px;position:relative;z-index:4}
+.abtn{width:64px;height:64px;border-radius:50%;border:2px solid var(--violet);background:radial-gradient(circle at 35% 30%,#3d236e,#150a30);
+  color:#fff;font-size:24px;cursor:pointer;transition:.18s;display:grid;place-items:center}
+.abtn:hover{transform:scale(1.1);box-shadow:0 0 18px var(--violet)}
+.abtn small{position:absolute;margin-top:88px;font-size:12px;color:#cbb8ff;font-family:Arial}
+.abtn-wrap{position:relative;display:grid;justify-items:center;gap:2px}
+.abtn-wrap span{font-size:12px;color:#cbb8ff;font-family:Arial}
+#turnBanner{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) scale(.8);z-index:10;font-size:44px;letter-spacing:2px;
+  color:#fff;text-shadow:0 0 24px var(--violet),0 0 60px var(--violet);opacity:0;pointer-events:none;text-align:center}
+#turnBanner.show{animation:banner 1.6s ease forwards}
+@keyframes banner{0%{opacity:0;transform:translate(-50%,-50%) scale(.7)}20%{opacity:1;transform:translate(-50%,-50%) scale(1.05)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(1)}}
+#projectile{position:absolute;width:26px;height:26px;border-radius:50%;z-index:9;pointer-events:none;display:none;
+  background:radial-gradient(circle,#fff,var(--cyan) 40%,transparent 70%);box-shadow:0 0 18px var(--cyan)}
+#battleLog{position:absolute;left:12px;bottom:12px;width:250px;max-height:180px;overflow-y:auto;font-family:Arial;font-size:12px;
+  background:rgba(0,0,0,.55);border:1px solid #ffffff2a;border-radius:10px;padding:8px;z-index:4}
+/* ---------- GALLERY ---------- */
+#view-gallery{background:#0a0816;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:18px}
+#slide{max-width:min(92vw,980px);max-height:62vh;border-radius:14px;border:2px solid var(--violet);box-shadow:0 0 40px rgba(160,79,255,.4);
+  animation:kenburns 8s ease-in-out infinite alternate;object-fit:contain;background:#000}
+@keyframes kenburns{from{transform:scale(1)}to{transform:scale(1.06)}}
+#slide.fade{animation:slideFade .5s}
+@keyframes slideFade{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}
+#galControls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center}
+#galHint{font-family:Arial;font-size:12px;color:#9d8cc8;max-width:900px;text-align:center}
+/* modals */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:99;padding:16px}
+.modal.open{display:flex}
+.sheet{width:min(860px,94vw);max-height:88vh;overflow:auto;background:linear-gradient(180deg,#241a4a,#120c26);
+  border:2px solid var(--violet);border-radius:16px;padding:18px;box-shadow:0 20px 60px #000}
+.sheet h2{margin-bottom:10px}
+.deck-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:10px}
+.mini{background:#1c1338;border:1px solid #6a5aaa;border-radius:10px;padding:10px;font-size:12px;font-family:Arial}
+.mini b{color:var(--gold)}
+@media(max-width:900px){.map-wrap{grid-template-columns:1fr}.event-panel{display:none}#grid3x3{grid-template-columns:repeat(3,88px)}.cell{width:88px;height:104px;font-size:34px}:root{--card-w:92px;--card-h:140px}#topbar{flex-wrap:wrap}.view{inset:auto;position:relative;min-height:calc(100vh - 77px)}body{overflow:auto}}
+</style>
+</head>
+<body>
+<header id="topbar">
+  <div class="portrait">🧙</div>
+  <div class="hero-meta"><b id="heroName">Арион</b><br><span id="heroSub">Level 1 · HP 30 · Ether 3</span></div>
+  <nav>
+    <button class="btn active-tab" data-tab="map">Map</button>
+    <button class="btn" data-tab="battle">Battle</button>
+    <button class="btn" data-tab="gallery">Storyboard</button>
+    <button class="btn ghost" id="deckBtn">Deck</button>
+    <button class="btn ghost" id="journalBtn">Journal</button>
+    <button class="btn ghost" id="restBtn">Rest</button>
+    <button class="btn ghost" id="saveBtn">Save</button>
+  </nav>
+  <div id="resources">💰 <b id="gold">120</b> · 🏆 <b id="wins">0</b> · Ход <b id="turnN">1</b></div>
+</header>
+
+<!-- MAP -->
+<section class="view active" id="view-map">
+  <div class="map-wrap">
+    <div class="map-canvas" id="mapCanvas">
+      <svg class="river" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <path d="M55 0 C 48 20, 62 30, 50 45 C 40 58, 48 75, 38 100" stroke="#7db8d4" stroke-width="5" fill="none" opacity=".8"/>
+        <path d="M58 0 C 51 20, 65 30, 53 45 C 43 58, 51 75, 41 100" stroke="#bfe6f5" stroke-width="1.6" fill="none" opacity=".8"/>
+      </svg>
+      <div id="heroToken" style="left:30%;top:62%">🧙</div>
+    </div>
+    <aside class="event-panel">
+      <h3>Event</h3>
+      <div id="eventLog"></div>
+      <div id="questBox">⭐ <b>Задание:</b> <span id="questText">посети лабораторию ⚗️</span></div>
+    </aside>
+  </div>
+</section>
+
+<!-- BATTLE -->
+<section class="view" id="view-battle">
+  <canvas id="stars"></canvas>
+  <div id="magicCircle"></div>
+  <div class="fighters">
+    <div class="fighter" id="fPlayer">
+      <div class="ava">🧙</div>
+      <div><div class="nm">Арион · <span id="pHpN">30</span> HP</div>
+        <div class="bar hp"><div class="fill" id="pHpF"></div><span id="pHpT">30/30</span></div>
+        <div class="bar ether"><div class="fill" id="pEthF"></div><span id="pEthT">Ether 3/7</span></div></div>
+    </div>
+    <div class="fighter enemy" id="fEnemy">
+      <div><div class="nm" style="text-align:right"><span id="eName">Порождение Пустоши</span> · <span id="eHpN">28</span> HP</div>
+        <div class="bar hp"><div class="fill" id="eHpF"></div><span id="eHpT">28/28</span></div>
+        <div class="bar ether"><div class="fill" id="eEthF"></div><span id="eEthT">Ether 5/5</span></div></div>
+      <div class="ava">👹</div>
+    </div>
+  </div>
+  <div id="grid3x3"></div>
+  <div id="hand"></div>
+  <div id="battleBtns">
+    <div class="abtn-wrap"><button class="abtn" id="bAttack" title="Атака">⚔️</button><span>Attack</span></div>
+    <div class="abtn-wrap"><button class="abtn" id="bCast" title="Каст выбранной карты">✨</button><span>Cast</span></div>
+    <div class="abtn-wrap"><button class="abtn" id="bDefend" title="Защита +2">🛡️</button><span>Block</span></div>
+    <div class="abtn-wrap"><button class="abtn" id="bEnd" title="Завершить ход">⏳</button><span>Pass</span></div>
+    <div class="abtn-wrap"><button class="abtn" id="bNew" title="Новый бой">↻</button><span>New</span></div>
+  </div>
+  <div id="turnBanner"></div>
+  <div id="projectile"></div>
+  <div id="battleLog"></div>
+</section>
+
+<!-- GALLERY = анимация скриншотов через JS -->
+<section class="view" id="view-gallery">
+  <img id="slide" alt="storyboard">
+  <div id="galControls">
+    <button class="btn" id="prevS">◀</button>
+    <button class="btn" id="playS">▶ Play</button>
+    <button class="btn" id="nextS">▶</button>
+    <span id="slideN" style="font-family:Arial"></span>
+  </div>
+  <div id="galHint">JS-анимация исходных скриншотов: Ken Burns + crossfade. Файлы берутся из папки <b>скришоты/</b>. Если картинка не найдена — показывается плейсхолдер (положите PNG рядом с прототипом).</div>
+</section>
+
+<div class="modal" id="modal"><div class="sheet"><h2 id="mTitle"></h2><div id="mBody"></div>
+  <div style="margin-top:12px;text-align:right"><button class="btn" id="mClose">Закрыть</button></div></div></div>
+
+<script>
+/* ================= STATE ================= */
+const S = {gold:120,wins:0,turn:1,level:1,hp:30,maxHp:30,ether:3,maxEther:7,
+  visited:{},questLab:false,
+  deck:['flame','frost','arcane','heal','sprite','frost','flame','arcane']};
+const CARDS = {
+  flame:{n:'Flame Strike',icon:'🔥',cost:2,cls:'fire',d:'6 урона врагу',fx:'fire'},
+  frost:{n:'Frost Shield',icon:'❄️',cost:2,cls:'frost',d:'Щит 6 + 2 урон',fx:'ice'},
+  arcane:{n:'Arcane Bolt',icon:'⚡',cost:1,cls:'arcane',d:'4 урона',fx:'zap'},
+  heal:{n:'Heal Pulse',icon:'💚',cost:2,cls:'nature',d:'+7 HP себе',fx:'heal'},
+  sprite:{n:'Summon Sprite',icon:'🐉',cost:3,cls:'holy',d:'8 урона + свет',fx:'holy'}
+};
+const NODES = [
+  {id:'v1',x:22,y:30,icon:'🌿',label:'Роща',type:'res'},
+  {id:'lab',x:44,y:26,icon:'⚗️',label:'Лаборатория',type:'lab'},
+  {id:'fire',x:70,y:34,icon:'🔥',label:'Гнездо хаота',type:'monster'},
+  {id:'water',x:48,y:48,icon:'💧',label:'Источник',type:'res'},
+  {id:'leaf',x:30,y:66,icon:'🍃',label:'Слобода',type:'village'},
+  {id:'gear',x:56,y:70,icon:'⚙️',label:'Голем',type:'monster'},
+  {id:'ruin',x:76,y:60,icon:'🏛️',label:'Руины',type:'ruin'}
+];
+/* ================= TABS ================= */
+document.querySelectorAll('#topbar nav [data-tab]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#topbar nav [data-tab]').forEach(x=>x.classList.remove('active-tab'));
+  b.classList.add('active-tab');
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+b.dataset.tab).classList.add('active');
+  if(b.dataset.tab==='battle') banner('Фаза: Подготовка');
+});
+/* ================= MAP ================= */
+const mapCanvas=document.getElementById('mapCanvas'), heroToken=document.getElementById('heroToken');
+NODES.forEach(n=>{
+  const d=document.createElement('div');d.className='map-node'+(n.type==='monster'?' danger':'');d.style.left=n.x+'%';d.style.top=n.y+'%';
+  d.innerHTML=n.icon+'<small>'+n.label+'</small>';d.title=n.label;d.onclick=()=>travel(n,d);mapCanvas.appendChild(d);n.el=d;
+});
+function ev(t){const l=document.getElementById('eventLog');const d=document.createElement('div');d.className='ev';d.textContent=t;l.prepend(d);}
+function syncTop(){document.getElementById('gold').textContent=S.gold;document.getElementById('wins').textContent=S.wins;
+  document.getElementById('turnN').textContent=S.turn;
+  document.getElementById('heroSub').textContent='Level '+S.level+' · HP '+S.hp+' · Ether '+S.ether;
+  document.getElementById('questText').textContent=S.questLab?'исследуй руины и победи голема ⚙️':'посети лабораторию ⚗️';}
+function travel(n){
+  heroToken.classList.add('moving');heroToken.style.left=n.x+'%';heroToken.style.top=n.y+'%';
+  setTimeout(()=>heroToken.classList.remove('moving'),850);
+  S.turn++;S.visited[n.id]=1;n.el.classList.add('done');
+  if(n.type==='monster'){ev('⚔️ '+n.label+': засада! Переход в Battle…');syncTop();
+    setTimeout(()=>{document.querySelector('[data-tab=battle]').click();newBattle(n.label);},900);}
+  else if(n.type==='lab'&&!S.questLab){S.questLab=true;S.deck.push('sprite');S.ether=Math.min(S.maxEther,S.ether+2);
+    ev('⚗️ Лаборатория: получена карта Summon Sprite +2 эфира.');}
+  else if(n.type==='village'){const g=20+Math.floor(Math.random()*20);S.gold+=g;S.hp=Math.min(S.maxHp,S.hp+5);ev('🏕️ Привал: +'+g+' золота, +5 HP.');}
+  else if(n.type==='res'){S.ether=Math.min(S.maxEther,S.ether+1);ev(n.icon+' Источник: +1 эфир.');}
+  else if(n.type==='ruin'){S.gold+=60;ev('🏛️ Руины: +60 золота и фрагмент портала.');}
+  syncTop();
+}
+/* ================= BATTLE ================= */
+const grid=document.getElementById('grid3x3'), handEl=document.getElementById('hand'), blog=document.getElementById('battleLog');
+let B=null, sel=null, shield=0;
+for(let i=0;i<9;i++){const c=document.createElement('div');c.className='cell';c.dataset.i=i;c.onclick=()=>cellClick(i);grid.appendChild(c);}
+function cells(){return[...grid.children];}
+function blogAdd(t){const d=document.createElement('div');d.textContent='• '+t;blog.prepend(d);}
+function banner(t){const b=document.getElementById('turnBanner');b.textContent=t;b.classList.remove('show');void b.offsetWidth;b.classList.add('show');}
+function newBattle(name){
+  B={p:{hp:S.hp,max:S.maxHp,eth:S.ether,maxE:S.maxEther},e:{hp:26+Math.floor(Math.random()*8),max:30,eth:5,maxE:5,name:name||'Порождение Пустоши'},
+     hand:[],field:Array(9).fill(null),eField:Array(9).fill(null),turn:1,over:false};
+  shield=0;sel=null;
+  for(let i=0;i<4;i++) drawCard();
+  // стартовое заклинание врага для красоты
+  B.eField[1]={icon:'🌀',enemy:true};
+  document.getElementById('eName').textContent=B.e.name;
+  blog.innerHTML='';blogAdd('Дуэль началась: '+B.e.name);banner('⚔️ Бой начался!');
+  renderB();
+}
+function drawCard(){if(!B||B.hand.length>=5)return;const k=S.deck[Math.floor(Math.random()*S.deck.length)];B.hand.push(k);}
+function renderB(){
+  if(!B)return;
+  document.getElementById('pHpN').textContent=Math.max(0,B.p.hp);document.getElementById('pHpT').textContent=Math.max(0,B.p.hp)+'/'+B.p.max;
+  document.getElementById('pHpF').style.width=(Math.max(0,B.p.hp)/B.p.max*100)+'%';
+  document.getElementById('pEthT').textContent='Ether '+B.p.eth+'/'+B.p.maxE;
+  document.getElementById('pEthF').style.width=(B.p.eth/B.p.maxE*100)+'%';
+  document.getElementById('eHpN').textContent=Math.max(0,B.e.hp);document.getElementById('eHpT').textContent=Math.max(0,B.e.hp)+'/'+B.e.max;
+  document.getElementById('eHpF').style.width=(Math.max(0,B.e.hp)/B.e.max*100)+'%';
+  document.getElementById('eEthT').textContent='Ether '+B.e.eth+'/'+B.e.maxE;
+  document.getElementById('eEthF').style.width=(B.e.eth/B.e.maxE*100)+'%';
+  cells().forEach((c,i)=>{const v=B.field[i]||B.eField[i];
+    c.classList.toggle('played',!!B.field[i]);c.classList.toggle('enemy-play',!!B.eField[i]&&!B.field[i]);
+    c.innerHTML=v?('<div class="flip" style="font-size:44px">'+v.icon+'</div>'):'';
+    if(v&&v.fx){c.style.boxShadow='0 0 26px '+(v.fx==='fire'?'#ff7a3d':v.fx==='ice'?'#6ad4ff':v.fx==='holy'?'#ffe27a':'#c98aff');}
+  });
+  handEl.innerHTML='';
+  B.hand.forEach((k,i)=>{const c=CARDS[k];const d=document.createElement('div');
+    d.className='card3d '+c.cls+(sel===i?' selected':'');d.style.animationDelay=(i*0.07)+'s';
+    d.innerHTML='<div class="cost">'+c.cost+'</div><div class="art">'+c.icon+'</div><div class="nm2">'+c.n+'</div><div class="txt">'+c.d+'</div>';
+    d.onclick=()=>{sel=(sel===i?null:i);renderB();if(sel!==null){cells().forEach(x=>x.classList.add('target'));blogAdd('Выбрано: '+c.n+' → кликни клетку');}else cells().forEach(x=>x.classList.remove('target'));};
+    handEl.appendChild(d);});
+}
+function floatDmg(el,txt,color){const s=document.createElement('div');s.className='dmg';s.textContent=txt;if(color)s.style.color=color;el.appendChild(s);setTimeout(()=>s.remove(),1000);}
+function projectile(fromEl,toEl,color,cb){
+  const p=document.getElementById('projectile');const a=fromEl.getBoundingClientRect(),b=toEl.getBoundingClientRect();
+  p.style.display='block';p.style.background='radial-gradient(circle,#fff,'+(color||'#38e1ff')+' 40%,transparent 70%)';
+  p.style.boxShadow='0 0 18px '+(color||'#38e1ff');
+  const x1=a.left+a.width/2,y1=a.top+a.height/2,x2=b.left+b.width/2,y2=b.top+b.height/2;
+  const t0=performance.now(),dur=450;
+  (function step(t){const k=Math.min(1,(t-t0)/dur);
+    p.style.left=(x1+(x2-x1)*k-13)+'px';p.style.top=(y1+(y2-y1)*k-13+Math.sin(k*Math.PI)*-60)+'px';
+    if(k<1)requestAnimationFrame(step);else{p.style.display='none';cb&&cb();}})(t0);
+}
+function cellClick(i){
+  if(!B||B.over)return;
+  if(sel===null){blogAdd('Сначала выбери карту в руке.');return;}
+  if(B.field[i]){blogAdd('Клетка занята.');return;}
+  const k=B.hand[sel],c=CARDS[k];
+  if(B.p.eth<c.cost){blogAdd('Не хватает эфира!');return;}
+  B.p.eth-=c.cost;B.hand.splice(sel,1);sel=null;cells().forEach(x=>x.classList.remove('target'));
+  B.field[i]={icon:c.icon,fx:c.fx};
+  blogAdd('Каст: '+c.n+' → клетка '+(i+1));
+  const cell=cells()[i],foe=document.getElementById('fEnemy');
+  const colors={fire:'#ff7a3d',ice:'#6ad4ff',zap:'#c98aff',heal:'#7de08a',holy:'#ffe27a'};
+  projectile(handEl,cell,colors[c.fx],()=>{
+    applyCard(c,cell);drawCard();renderB();checkEnd();
+  });
+  renderB();
+}
+function applyCard(c,cell){
+  const foeBox=document.getElementById('fEnemy'),me=document.getElementById('fPlayer');
+  if(c.fx==='heal'){B.p.hp=Math.min(B.p.max,B.p.hp+7);floatDmg(cells()[B.field.indexOf(B.field.find(x=>x&&x.fx==='heal'))]||cell,'+7','#7de08a');blogAdd('Исцеление +7 HP.');}
+  else if(c.fx==='ice'){B.e.hp-=2;shield+=6;floatDmg(foeBox,'-2','#6ad4ff');blogAdd('Frost Shield: щит +6, урон 2.');}
+  else{const dmg=c.fx==='fire'?6:c.fx==='holy'?8:4;B.e.hp-=dmg;
+    foeBox.classList.remove('shake');void foeBox.offsetWidth;foeBox.classList.add('shake');
+    floatDmg(foeBox,'-'+dmg,'#ffd34d');blogAdd(c.n+': '+dmg+' урона.');}
+}
+document.getElementById('bAttack').onclick=()=>{
+  if(!B||B.over)return;const n=B.field.filter(Boolean).length;const dmg=3+Math.min(9,n*2);
+  const foe=document.getElementById('fEnemy');
+  projectile(document.getElementById('fPlayer'),foe,'#ff7a3d',()=>{
+    B.e.hp-=dmg;foe.classList.remove('shake');void foe.offsetWidth;foe.classList.add('shake');
+    floatDmg(foe,'-'+dmg,'#ffd34d');blogAdd('⚔️ Атака заклинаниями: '+dmg);renderB();checkEnd();if(!B.over)enemyTurn();});
+};
+document.getElementById('bCast').onclick=()=>blogAdd(sel===null?'Выбери карту, затем клетку.':'Теперь кликни свободную клетку поля.');
+document.getElementById('bDefend').onclick=()=>{if(!B||B.over)return;if(B.p.eth<1){blogAdd('Нет эфира на блок.');return;}B.p.eth--;shield+=4;blogAdd('🛡️ Блок: щит +4.');renderB();};
+document.getElementById('bEnd').onclick=()=>{if(!B||B.over)return;blogAdd('⏳ Ход передан противнику.');enemyTurn(true);};
+document.getElementById('bNew').onclick=()=>newBattle();
+function enemyTurn(pass){
+  if(!B||B.over)return;banner('Ход противника');
+  setTimeout(()=>{
+    const dmg=Math.max(0,3+Math.floor(Math.random()*4)-0+(pass?2:0));
+    const blocked=Math.min(shield,dmg);shield-=blocked;const real=dmg-blocked;
+    B.p.hp-=real;B.p.eth=Math.min(B.p.maxE,B.p.eth+2);B.e.eth=Math.min(B.e.maxE,B.e.eth+1);drawCard();
+    const me=document.getElementById('fPlayer');me.classList.remove('shake');void me.offsetWidth;me.classList.add('shake');
+    floatDmg(me,'-'+real,'#ff8a9a');blogAdd('👹 Враг бьёт на '+real+(blocked?' (блок '+blocked+')':'')+'. +2 эфира тебе.');
+    B.turn++;S.turn++;syncTop();renderB();checkEnd();
+  },900);
+}
+function checkEnd(){
+  if(!B||B.over)return;
+  if(B.e.hp<=0){B.over=true;const rw=40+Math.floor(Math.random()*30);S.gold+=rw;S.wins++;S.hp=B.p.hp;S.ether=B.p.eth;
+    banner('🏆 ПОБЕДА! +'+rw);blogAdd('Победа! +'+rw+' золота.');syncTop();}
+  if(B.p.hp<=0){B.over=true;S.gold=Math.max(0,S.gold-20);S.hp=10;S.ether=1;
+    banner('💀 ПОРАЖЕНИЕ');blogAdd('Поражение. -20 золота.');syncTop();}
+}
+/* звёзды */
+(function(){const cv=document.getElementById('stars'),ctx=cv.getContext('2d');let P=[];
+  function rs(){cv.width=cv.offsetWidth;cv.height=cv.offsetHeight;P=Array.from({length:120},()=>({x:Math.random()*cv.width,y:Math.random()*cv.height,r:Math.random()*1.8+.3,s:Math.random()*.5+.1}));}
+  rs();addEventListener('resize',rs);
+  (function loop(){ctx.clearRect(0,0,cv.width,cv.height);ctx.fillStyle='#bfa8ff';
+    P.forEach(p=>{p.y-=p.s;if(p.y<0)p.y=cv.height;ctx.globalAlpha=.3+Math.random()*.5;ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,7);ctx.fill();});
+    ctx.globalAlpha=1;requestAnimationFrame(loop);})();})();
+/* ================= MODALS ================= */
+const modal=document.getElementById('modal');
+function showM(t,h){document.getElementById('mTitle').textContent=t;document.getElementById('mBody').innerHTML=h;modal.classList.add('open');}
+document.getElementById('mClose').onclick=()=>modal.classList.remove('open');
+modal.onclick=e=>{if(e.target===modal)modal.classList.remove('open');};
+document.getElementById('deckBtn').onclick=()=>showM('Колода ('+S.deck.length+')',
+  '<div class="deck-grid">'+S.deck.map(k=>{const c=CARDS[k];return '<div class="mini"><b>'+c.icon+' '+c.n+'</b><br>Cost '+c.cost+'<br>'+c.d+'</div>';}).join('')+'</div>');
+document.getElementById('journalBtn').onclick=()=>showM('Журнал',
+  '<p>Уровень '+S.level+' · Побед '+S.wins+' · Точек открыто '+Object.keys(S.visited).length+'</p><p>Лаборатория: '+(S.questLab?'✓':'—')+'</p><p style="opacity:.7">Прототип: карта → бой 3×3, каст выбором карты + клетки, анимации снарядов, щитов, урона, ход врага, сейв.</p>');
+document.getElementById('restBtn').onclick=()=>{S.ether=Math.min(S.maxEther,S.ether+1);S.hp=Math.min(S.maxHp,S.hp+3);S.turn++;ev('⛺ Отдых: +1 эфир, +3 HP.');syncTop();if(B){B.p.eth=S.ether;B.p.hp=S.hp;renderB();}};
+document.getElementById('saveBtn').onclick=()=>{localStorage.setItem('demiurge_proto',JSON.stringify(S));ev('💾 Сохранено.');};
+/* ================= GALLERY (анимация скриншотов) ================= */
+const shots=['1788687455.png','1788687469.png','1788687483.png','1788687495.png','1788687509.png','1788687523.png','1788687537.png','1788687550.png','1788687564.png','1788687577.png','1788687605.png','1788687619.png','1788687634.png','1788687649.png','1788689719.png','1788689725.png','1788689731.png','1788689736.png'];
+let gi=0,playing=false,timer=null;
+const slide=document.getElementById('slide');
+function showShot(){slide.classList.remove('fade');void slide.offsetWidth;slide.classList.add('fade');
+  slide.src='скришоты/'+shots[gi];
+  slide.onerror=()=>{slide.src='';slide.alt='Нет файла скришоты/'+shots[gi]+' — положите PNG рядом';};
+  document.getElementById('slideN').textContent=(gi+1)+' / '+shots.length+' · '+shots[gi];}
+document.getElementById('prevS').onclick=()=>{gi=(gi-1+shots.length)%shots.length;showShot();};
+document.getElementById('nextS').onclick=()=>{gi=(gi+1)%shots.length;showShot();};
+document.getElementById('playS').onclick=e=>{playing=!playing;e.target.textContent=playing?'⏸ Pause':'▶ Play';
+  if(playing)timer=setInterval(()=>{gi=(gi+1)%shots.length;showShot();},2500);else clearInterval(timer);};
+/* init */
+(function(){try{const s=JSON.parse(localStorage.getItem('demiurge_proto'));if(s)Object.assign(S,s);}catch(e){}
+ ev('Добро пожаловать в Долину Зелёной Реки. Кликай по точкам карты.');ev('Подсказка: ⚗️ лаборатория даёт новую карту, 🔥/⚙️ ведут в бой.');
+ syncTop();newBattle();showShot();})();
+</script>
+</body>
+</html>
