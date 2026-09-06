@@ -85,7 +85,7 @@ h1.title{font-size:50px;text-align:center;color:#ffe9a8;text-shadow:0 0 30px #a0
 @keyframes summon{0%{transform:scale(.3);filter:brightness(3)}60%{transform:scale(1.12)}100%{transform:scale(1)}}
 .unit{width:96px;height:124px}
 .unit.anim-atk{animation:uatk .45s}
-@keyframes uatk{30%{transform:scale(1.16);filter:brightness(2)}60%{transform:scale(.96)}}
+@keyframes uatk{30%{transform:translateX(var(--dx,0)) scale(1.16);filter:brightness(2)}60%{transform:scale(.96)}}
 .unit.anim-hit{animation:uhit .4s}
 @keyframes uhit{20%{transform:translateX(-7px);filter:brightness(2.2)}45%{transform:translateX(6px)}70%{transform:translateX(-3px)}}
 .unit.anim-def{animation:udef .7s}
@@ -93,6 +93,10 @@ h1.title{font-size:50px;text-align:center;color:#ffe9a8;text-shadow:0 0 30px #a0
 .unit.anim-die{animation:udie .65s forwards}
 @keyframes udie{to{opacity:0;transform:translateY(26px) scale(.65);filter:grayscale(1) brightness(.25)}}
 .unit .rg{position:absolute;top:2px;right:2px;font-size:13px;text-shadow:0 1px 3px #000}
+.unit .lf{position:absolute;top:2px;left:2px;font-size:13px;text-shadow:0 1px 3px #000}
+.unit.sel{border-color:#38e1ff;box-shadow:0 0 0 3px #38e1ff,0 0 22px #38e1ff}
+.unit.ready img{animation:breathe 3.2s ease-in-out infinite}
+@keyframes breathe{50%{transform:scale(1.045)}}
 .rowbox .empty{color:#8a7ab8;font-size:12px;font-family:Arial;align-self:center}
 #hand{display:flex;gap:10px;margin-top:10px;flex-wrap:nowrap;flex-direction:column;align-items:center;max-height:46vh;overflow:auto;min-height:172px}
 .hcard{width:116px;border-radius:12px;overflow:hidden;cursor:pointer;position:relative;background:#140b32;border:2px solid #8a6bd8;transition:.18s;animation:deal .4s backwards}
@@ -186,7 +190,7 @@ h1.title{font-size:50px;text-align:center;color:#ffe9a8;text-shadow:0 0 30px #a0
         <div class="rowbox" id="pAtk"><div class="rlab">⚔ НАПАДЕНИЕ — дерутся сами</div></div>
         <div class="rowbox" id="pDef"><div class="rlab">🛡 ЗАЩИТА — блокируют первыми</div></div>
       </div>
-      <div id="midcol"><div class="board-label">КАРТЫ · ЛКМ выбрать · ПКМ описание</div>
+      <div id="midcol"><div class="board-label">КАРТЫ · ЛКМ выбрать · 2×ЛКМ в бой · ПКМ описание</div>
         <div id="hand"></div>
         <div id="abtns">
           <div><button class="ab" id="aEnd">⏳</button><div class="abl">Конец хода (бой!)</div></div>
@@ -338,7 +342,7 @@ function rowName(r){return r==='def'?'защиту':'нападение';}
 function startBattle(fk){const F=FOES[fk];bid++;
  B={id:bid,fk,foe:F,round:1,phase:'prep',over:false,auto:$('aAuto').classList.contains('on'),
    P:mkMage(S.hp,S.maxHp,S.deck),E:mkMage(F.hp,F.hp,F.deck)};
- $('eNm').textContent=F.n;$('ePa').src=F.art;$('bLog').innerHTML='';
+  $('eNm').textContent=F.n;$('ePa').src=F.art;$('bLog').innerHTML='';selCard=-1;selUnit=-1;
  drawM(B.P,3);drawM(B.E,2);
  go('battle',BGS[F.bg]);banner('⚔️ '+F.n);blog('Дуэль: '+F.n+'. Эфир = каналы, остаток сгорает.');
  prepPhase();}
@@ -350,7 +354,7 @@ function drawM(M,n){for(let i=0;i<n;i++){if(M.hand.length>=5)break;
 async function prepPhase(){if(!B||B.over)return;setPhase('prep','Подготовка · раунд '+B.round);
  B.P.ch=Math.min(6,3+Math.floor((B.round-1)/3));B.E.ch=Math.min(6,3+Math.floor((B.round-1)/3));
  B.P.eth=B.P.ch;B.E.eth=B.E.ch; // остаток сгорает
-  [B.P,B.E].forEach(M=>allU(M).forEach(u=>{u.ready=true;u.attacking=false;u.hp=u.maxHp;})); // встали и исцелились
+  [B.P,B.E].forEach(M=>allU(M).forEach(u=>{u.ready=true;u.attacking=false;u._moved=false;u.hp=u.maxHp;})); // встали и исцелились
  drawM(B.P,1);drawM(B.E,1);
  blog('Эфир: '+B.P.eth+' (каналы '+B.P.ch+'). Существа встали и исцелились.');
  renderB();await sleep(700);
@@ -360,7 +364,8 @@ function buttons(){const busy=!B||B.over||B.phase!=='magic';
  $('aEnd').disabled=busy;}
 /* --- магия игрока --- */
 /* --- магия игрока: ЛКМ по карте = выбрать, затем клик по своему ряду (существо) или цели (заклинание); ПКМ = описание --- */
-let selCard=-1;
+let selCard=-1; // выбранная карта руки
+let selUnit=-1; // выбранное своё существо (для перестановки между рядами)
 function tgtAny(){return !!(B&&B.phase==='magic'&&selCard>=0&&!isUnit(B.P.hand[selCard])&&SPELLS[B.P.hand[selCard]].tgt==='any');}
 function renderB(){if(!B)return;
  $('pHp').style.width=(Math.max(0,B.P.hp)/S.maxHp*100)+'%';$('pEt').style.width=(B.P.eth/Math.max(1,B.P.ch)*100)+'%';
@@ -382,22 +387,39 @@ function renderB(){if(!B)return;
   const d=document.createElement('div');d.className='hcard'+(selCard===i?' sel':'')+((u?c.cost:c.cost)>B.P.eth?' poor':'');
   d.style.animationDelay=(i*.05)+'s';
   d.innerHTML='<div class="cc">'+(u?c.cost:c.cost)+'</div><img src="'+c.art+'"><div class="cn">'+c.n+'</div><div class="cs">'+(u?('Существо '+c.atk+'/'+c.hp+(c.fs?' · ⚡':'')+(c.rng?' · 🏹':'')):c.txt)+'</div>';
-  d.onclick=()=>{if(!B||B.over||B.phase!=='magic')return;selCard=selCard===i?-1:i;renderB();};h.appendChild(d);});
+  d.onclick=()=>{if(!B||B.over||B.phase!=='magic')return;selCard=selCard===i?-1:i;selUnit=-1;renderB();};
+  d.ondblclick=()=>{if(!B||B.over||B.phase!=='magic')return;if(isUnit(B.P.hand[i])){selCard=i;selUnit=-1;summon('atk');}}; // 2×ЛКМ — быстро в нападение
+  h.appendChild(d);});
  buttons();}
 function renderRow(el,arr,opts){opts=opts||{};el.classList.toggle('placeable',!!opts.place);
  el.innerHTML='';
  const lab=document.createElement('div');lab.className='rlab';
- lab.textContent=el.id==='pAtk'?'⚔ НАПАДЕНИЕ — дерутся сами':el.id==='pDef'?'🛡 ЗАЩИТА — блокируют первыми':el.id==='eAtk'?'⚔ НАПАДЕНИЕ':'🛡 ЗАЩИТА';
+ const n=arr.length;
+ lab.textContent=el.id==='pAtk'?'⚔ НАПАДЕНИЕ — дерутся сами ('+n+'/'+MAX_ROW+')'
+  :el.id==='pDef'?'🛡 ЗАЩИТА — блокируют первыми ('+n+'/'+MAX_ROW+')'
+  :el.id==='eAtk'?'⚔ НАПАДЕНИЕ ВРАГА ('+n+')':'🛡 ЗАЩИТА ВРАГА ('+n+')';
  el.appendChild(lab);
  arr.forEach(u=>{const d=document.createElement('div');
-  d.className='unit'+(u.ready?' ready':'')+(u.attacking?' attacking':'')+(u._blk?' blocking':'')+(u._hurt?' hurt':'')+(u._die?' anim-die':'')+(opts.tgt?' tgt':'');
+  d.className='unit'+(u.ready?' ready':'')+(u.attacking?' attacking':'')+(u._blk?' blocking':'')+(u._hurt?' hurt':'')+(u._die?' anim-die':'')+(u.uid===selUnit?' sel':'')+(opts.tgt?' tgt':'');
   d.dataset.uid=u.uid;
-  d.innerHTML=(u.rng?'<span class="rg">🏹</span>':'')+'<img src="'+u.art+'"><div class="un">'+u.n+'</div><div class="st"><b class="atk">⚔'+u.atk+'</b><b class="hp2">❤'+Math.max(0,u.hp)+'</b></div>';
+  d.innerHTML=(u.rng?'<span class="rg">🏹</span>':'')+(u.fs?'<span class="lf">⚡</span>':'')+'<img src="'+u.art+'"><div class="un">'+u.n+'</div><div class="st"><b class="atk">⚔'+u.atk+'</b><b class="hp2">❤'+Math.max(0,u.hp)+'</b></div>';
   el.appendChild(d);});
  if(!arr.length){const e=document.createElement('div');e.className='empty';e.textContent='— пусто —';el.appendChild(e);}}
-function placeSel(row){if(!B||B.over||B.phase!=='magic'||selCard<0)return;
- if(isUnit(B.P.hand[selCard]))summon(row);}
+function placeSel(row){if(!B||B.over||B.phase!=='magic')return;
+ if(selCard>=0&&isUnit(B.P.hand[selCard])){summon(row);return;}
+ if(selCard<0&&selUnit>=0)moveUnit(selUnit,row);}
+function moveUnit(uid,row){const u=findUnit(B.P,uid);if(!u||u._die){selUnit=-1;renderB();return;}
+ if(u._row===row){selUnit=-1;renderB();return;}
+ if(u._moved){blog('Это существо уже переставляли в этом раунде');selUnit=-1;renderB();return;}
+ if(B.P.board[row].length>=MAX_ROW){blog('Ряд '+rowName(row)+' полон');return;}
+ B.P.board[u._row].splice(B.P.board[u._row].indexOf(u),1);
+ u._row=row;u._moved=true;B.P.board[row].push(u);selUnit=-1;renderB();
+ const el=document.querySelector('#'+(row==='atk'?'pAtk':'pDef')+' [data-uid="'+uid+'"]');
+ ring(el||$(row==='atk'?'pAtk':'pDef'),'#38e1ff');
+ blog('🔀 '+u.n+' → '+rowName(row));}
 $('pAtk').onclick=()=>placeSel('atk');$('pDef').onclick=()=>placeSel('def');
+document.addEventListener('click',e=>{const t=e.target.closest('#sideP .unit');
+ if(t&&B&&!B.over&&B.phase==='magic'&&selCard<0){const uid=+t.dataset.uid;selUnit=selUnit===uid?-1:uid;renderB();}});
 /* ПКМ-описания карт и существ */
 let tipTimer=null;
 function showTip(html,x,y){let t=$('tip');if(!t){t=document.createElement('div');t.id='tip';document.body.appendChild(t);}
@@ -407,13 +429,22 @@ function showTip(html,x,y){let t=$('tip');if(!t){t=document.createElement('div')
 function describe(k){if(isUnit(k)){const c=UNITS[k];
   return '<b>'+c.n+'</b><br>Существо · цена '+c.cost+'<br>⚔ '+c.atk+' · ❤ '+c.hp+(c.fs?'<br>⚡ Первый удар — отвечает без урона':'' )+(c.rng?'<br>🏹 Дальнобойный — бьёт мага напрямую, блоки не действуют':'')+'<br><i>ЛКМ — выбрать, затем клик по ряду. ПКМ — описание.</i>';}
  const c=SPELLS[k];return '<b>'+c.n+'</b><br>Заклинание · цена '+c.cost+'<br>'+c.txt+'<br><i>ЛКМ — выбрать, затем клик по цели. ПКМ — описание.</i>';}
-function describeU(u){return '<b>'+u.n+'</b><br>'+(u._row==='def'?'🛡 ряд защиты':'⚔ ряд нападения')+'<br>⚔ '+u.atk+' · ❤ '+Math.max(0,u.hp)+'/'+u.maxHp+(u.fs?'<br>⚡ Первый удар':'')+(u.rng?'<br>🏹 Дальнобойный — бьёт мага напрямую':'');}
+function describeU(u){return '<b>'+u.n+'</b><br>'+(u._row==='def'?'🛡 ряд защиты — блокирует первым':'⚔ ряд нападения')+'<br>⚔ '+u.atk+' · ❤ '+Math.max(0,u.hp)+'/'+u.maxHp+(u.fs?'<br>⚡ Первый удар — бьёт первым, ответа нет':'')+(u.rng?'<br>🏹 Дальнобойный — бьёт мага напрямую, в ответ не получает':'')+(u._moved?'<br><i>Уже переставлялось в этом раунде</i>':'');}
+function describeMage(s){const M=s==='P'?B.P:B.E,nm=s==='P'?'Арион':B.foe.n,mx=s==='P'?S.maxHp:B.E.maxHp;
+ return '<b>'+nm+'</b><br>Маг · ❤ '+Math.max(0,M.hp)+'/'+mx+'<br>◆ Эфир '+M.eth+'/'+M.ch+' (каналы, остаток сгорает)<br>🛡 Щит '+M.shield+' · 🪦 '+M.grave.length+(s==='E'?'<br>Колода врага: '+M.deck.length+' карт':'');}
+function tipAt(t,x,y){if(!B||!t)return;
+ if(t.classList.contains('hcard')){const i=Array.prototype.indexOf.call($('hand').children,t);const k=B.P.hand[i];if(k)showTip(describe(k),x,y);}
+ else if(t.classList.contains('unit')){const uid=+t.dataset.uid;const u=allU(B.P).concat(allU(B.E)).find(x=>x.uid===uid);if(u)showTip(describeU(u),x,y);}
+ else if(t.id==='pcard')showTip(describeMage('P'),x,y);
+ else if(t.id==='ecard')showTip(describeMage('E'),x,y);}
 document.addEventListener('contextmenu',e=>{
- const hc=e.target&&e.target.closest?e.target.closest('.hcard'):null;
- const un=e.target&&e.target.closest?e.target.closest('.unit'):null;
- if(!B||(!hc&&!un))return;e.preventDefault();
- if(hc){const i=Array.prototype.indexOf.call($('hand').children,hc);const k=B.P.hand[i];if(k)showTip(describe(k),e.clientX,e.clientY);}
- else{const uid=+un.dataset.uid;const u=allU(B.P).concat(allU(B.E)).find(x=>x.uid===uid);if(u)showTip(describeU(u),e.clientX,e.clientY);}});
+ const t=e.target&&e.target.closest?e.target.closest('.hcard,.unit,#pcard,#ecard'):null;
+ if(!B||!t)return;e.preventDefault();tipAt(t,e.clientX,e.clientY);});
+let hovT=null; // ховер-подсказка с задержкой
+document.addEventListener('mouseover',e=>{clearTimeout(hovT);
+ const t=e.target&&e.target.closest?e.target.closest('.hcard,.unit,#pcard,#ecard'):null;
+ if(!B||!t)return;hovT=setTimeout(()=>tipAt(t,e.clientX,e.clientY),700);});
+document.addEventListener('mouseout',()=>clearTimeout(hovT));
 document.addEventListener('click',e=>{const t=$('tip');if(t&&t.style&&!(e.target&&e.target.closest&&e.target.closest('#tip')))t.style.display='none';});
 $('ecard').onclick=()=>castTarget('emage');$('pcard').onclick=()=>castTarget('pmage');
 document.addEventListener('click',e=>{const t=e.target.closest('#sideE .unit');if(t&&B&&B.phase==='magic'&&selCard>=0&&!isUnit(B.P.hand[selCard]))castTarget('unit',+t.dataset.uid);});
@@ -422,8 +453,9 @@ function summon(row){row=row||'atk';const k=B.P.hand[selCard];if(!isUnit(k))retu
  if(B.P.board[row].length>=MAX_ROW){blog('Ряд '+rowName(row)+' полон (макс. '+MAX_ROW+')');return;}
  B.P.eth-=c.cost;B.P.hand.splice(selCard,1);selCard=-1;
  const u=newUnit(k);u._row=row;B.P.board[row].push(u);renderB();
+ const col=row==='atk'?'#ff9a3d':'#38e1ff'; // портал цвета ряда: нападение — огонь, защита — лёд
  const el=document.querySelector('#'+(row==='atk'?'pAtk':'pDef')+' [data-uid="'+u.uid+'"]');
- ring(el||$(row==='atk'?'pAtk':'pDef'),'#c98aff');if(el){el.classList.add('summon');puff(...Object.values(ctr(el)),'#c98aff',20);}
+ ring(el||$(row==='atk'?'pAtk':'pDef'),col);if(el){el.classList.add('summon');puff(...Object.values(ctr(el)),col,20);}
  blog('✨ Призыв в '+rowName(row)+': '+c.n+' ('+c.atk+'/'+c.hp+')');}
 function castTarget(kind,uid){if(!B||B.over||B.phase!=='magic'||selCard<0)return;
  const k=B.P.hand[selCard];if(isUnit(k))return;const c=SPELLS[k];
@@ -471,6 +503,7 @@ function chooseBlocks(atk,blk,heroHp){const m={},free=[...blk];
       ||free.slice().sort((x,y)=>x.atk-y.atk)[0];
   if(c){m[a.uid].push(c.uid);free.splice(free.indexOf(c),1);}}
  return m;}
+function setDx(el,v){try{if(el&&el.style&&el.style.setProperty)el.style.setProperty('--dx',v);}catch(e){}} // направление выпада: наши → вправо, враг → влево
 async function resolveAll(side){const myBid=B.id;setPhase('resolve','Бой — авторазрешение');
  const A=side==='P'?B.P:B.E,D=side==='P'?B.E:B.P;
  const atk=aliveU(A).filter(u=>u.attacking);
@@ -483,7 +516,7 @@ async function resolveAll(side){const myBid=B.id;setPhase('resolve','Бой — 
  for(const a of atk){if(!B||B.id!==myBid||B.over)return;
   if(a.hp<=0||a._die)continue;
   const aEl=document.querySelector('[data-uid="'+a.uid+'"]');
-  if(aEl){aEl.classList.remove('anim-atk');void aEl.offsetWidth;aEl.classList.add('anim-atk');} // анимация атаки
+  if(aEl){aEl.classList.remove('anim-atk');void aEl.offsetWidth;setDx(aEl,side==='P'?'30px':'-30px');aEl.classList.add('anim-atk');} // выпад в сторону врага
   if(a.rng){ // 🏹 дальнобойный бьёт мага напрямую — блоки не действуют
    blog('🏹 '+a.n+' ('+a.atk+'/'+Math.max(0,a.hp)+') — дальний удар по магу!');
    await sleep(420);if(!B||B.id!==myBid||B.over)return;
